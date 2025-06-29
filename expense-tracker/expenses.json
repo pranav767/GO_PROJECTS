@@ -1,0 +1,20 @@
+[
+  {
+    "id": 2,
+    "description": "gym",
+    "amount": 2000,
+    "date": "2025-06-29T18:00:41.651503319+05:30"
+  },
+  {
+    "id": 3,
+    "description": "",
+    "amount": 250,
+    "date": "2025-06-29T21:48:56.589738031+05:30"
+  },
+  {
+    "id": 4,
+    "description": "bought some cool fidget",
+    "amount": 250,
+    "date": "2025-06-29T21:52:20.363753682+05:30"
+  }
+]
