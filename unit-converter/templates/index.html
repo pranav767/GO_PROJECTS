@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unit Converter</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Unit Converter</h1>
+            <p class="subtitle">Convert between different units with ease</p>
+        </div>
+        
+        {{if .error}}
+            <div class="alert alert-error">
+                <span class="alert-icon">⚠️</span>
+                {{.error}}
+            </div>
+        {{end}}
+        
+        <div class="converter-card">
+            <form action="/convert" method="POST" class="converter-form">
+                <div class="form-group">
+                    <label for="parameter">Choose a Parameter:</label>
+                    <select name="parameter" id="parameter" class="form-select" onchange="updateUnits()">
+                        <option value="">-- Select Parameter --</option>
+                        <option value="length">Length</option>
+                        <option value="weight">Weight</option>
+                        <option value="temperature">Temperature</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="value">Value</label>
+                    <input type="number" step="any" name="value" id="value" class="form-input" placeholder="Enter value to convert" required>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="from_unit">From</label>
+                        <select name="from_unit" id="from_unit" class="form-select">
+                            <option value="">Select parameter first</option>
+                        </select>
+                    </div>
+                    
+                    <div class="swap-icon" onclick="swapUnits()">
+                        <span>⇄</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="to_unit">To</label>
+                        <select name="to_unit" id="to_unit" class="form-select">
+                            <option value="">Select parameter first</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-convert">
+                    <span class="btn-text">Convert</span>
+                    <span class="btn-icon">🔄</span>
+                </button>
+            </form>
+        </div>
+        
+        {{if .result}}
+            <div class="result-card">
+                <div class="result-header">
+                    <span class="result-icon">✅</span>
+                    <h2>Conversion Result</h2>
+                </div>
+                <div class="result-content">
+                    <div class="result-value">
+                        <span class="original">{{.original_value}} {{.from_unit}}</span>
+                        <span class="equals">=</span>
+                        <span class="converted">{{.result}} {{.to_unit}}</span>
+                    </div>
+                </div>
+            </div>
+        {{end}}
+    </div>
+
+    <script>
+        // Define units for each parameter
+        const unitOptions = {
+            'length': [
+                { value: 'meters', text: 'Meters' },
+                { value: 'feet', text: 'Feet' },
+                { value: 'inches', text: 'Inches' },
+                { value: 'kilometers', text: 'Kilometers' },
+                { value: 'centimeters', text: 'Centimeters' },
+                { value: 'millimeters', text: 'Millimeters' },
+                { value: 'yards', text: 'Yards' },
+                { value: 'miles', text: 'Miles' }
+            ],
+            'weight': [
+                { value: 'kilograms', text: 'Kilograms' },
+                { value: 'pounds', text: 'Pounds' },
+                { value: 'grams', text: 'Grams' },
+                { value: 'ounces', text: 'Ounces' },
+                { value: 'tons', text: 'Tons' },
+                { value: 'stones', text: 'Stones' }
+            ],
+            'temperature': [
+                { value: 'celsius', text: 'Celsius' },
+                { value: 'fahrenheit', text: 'Fahrenheit' },
+                { value: 'kelvin', text: 'Kelvin' }
+            ]
+        };
+
+        // Function to update unit dropdowns based on selected parameter
+        function updateUnits() {
+            const parameter = document.getElementById('parameter').value;
+            const fromSelect = document.getElementById('from_unit');
+            const toSelect = document.getElementById('to_unit');
+            
+            // Clear existing options
+            fromSelect.innerHTML = '';
+            toSelect.innerHTML = '';
+            
+            if (parameter && unitOptions[parameter]) {
+                // Add units for selected parameter
+                unitOptions[parameter].forEach(unit => {
+                    const fromOption = new Option(unit.text, unit.value);
+                    const toOption = new Option(unit.text, unit.value);
+                    fromSelect.add(fromOption);
+                    toSelect.add(toOption);
+                });
+            } else {
+                // Add default option
+                fromSelect.add(new Option('Select parameter first', ''));
+                toSelect.add(new Option('Select parameter first', ''));
+            }
+        }
+
+        // Function to swap units
+        function swapUnits() {
+            const fromSelect = document.getElementById('from_unit');
+            const toSelect = document.getElementById('to_unit');
+            
+            const fromValue = fromSelect.value;
+            const toValue = toSelect.value;
+            
+            fromSelect.value = toValue;
+            toSelect.value = fromValue;
+        }
+    </script>
+</body>
+</html>
