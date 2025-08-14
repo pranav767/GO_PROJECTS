@@ -32,6 +32,10 @@ var rootCmd = &cobra.Command{
 			proxy.StartProxy(port, origin)
 		}
 		if cmd.Flags().Changed("clear-cache") {
+			if port == "" {
+				fmt.Println("Error: --port is required when using --clear-cache")
+				os.Exit(1)
+			}
 			server.RequestClearCache(port)
 		}
 	},
