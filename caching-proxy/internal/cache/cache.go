@@ -13,7 +13,7 @@ type CachedResponse struct {
 	Status  int
 }
 
-// Setup cache variable which will be a slice of map, keys as string and values as cachedresponse struct
+// Setup cache variable which will be a map with string keys and CachedResponse values
 var (
     cache      = make(map[string]CachedResponse)
     cacheMutex sync.RWMutex
