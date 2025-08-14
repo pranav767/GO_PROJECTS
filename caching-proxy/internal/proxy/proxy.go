@@ -13,7 +13,8 @@ func StartProxy(port, origin string) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Forward the request to the origin
 		// Get the key from the request , i.e. say /products
-		cacheKey := r.URL.RequestURI()
+		// Get the key from the request path, e.g. /products
+		cacheKey := r.URL.Path
 		if cachedResp, found := cache.Get(cacheKey); found {
 			// If found set cached headers
 			for k, v := range cachedResp.Headers {
