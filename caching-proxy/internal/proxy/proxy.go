@@ -71,5 +71,7 @@ func StartProxy(port, origin string) {
 		w.Write([]byte("Cache cleared successfully"))
 	})
 
-    http.ListenAndServe(":"+port, nil)
+    if err := http.ListenAndServe(":"+port, nil); err != nil {
+        log.Fatal("Failed to start proxy server: ", err)
+    }
 }
