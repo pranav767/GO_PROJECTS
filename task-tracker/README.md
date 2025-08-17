@@ -22,8 +22,8 @@ Task Tracker CLI is a command-line tool to manage your tasks efficiently. It all
 
 1. **Clone the repository:**
    ```sh
-   git clone https://github.com/yourusername/task-tracker.git
-   cd task-tracker
+   git clone https://github.com/pranav767/GO_PROJECTS.git
+   cd GO_PROJECTS/task-tracker
    ```
 
 2. **Build the CLI:**
@@ -92,5 +92,6 @@ main.go      # Entry point
 This project does **not** use a database. All tasks are saved in a local `tasks.json` file, which is automatically created and updated as you use the CLI. This makes it easy to use and portable—just keep your `tasks.json` file to retain your tasks.
 
 If you delete or move the `tasks.json` file, your tasks will be lost or moved accordingly. No external dependencies or database setup is required.
+
 
 Built with Go and [Cobra](https://github.com/spf13/cobra)
