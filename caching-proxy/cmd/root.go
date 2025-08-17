@@ -1,10 +1,11 @@
 /*
-*/
+ */
 package cmd
 
 import (
 	"caching-proxy/internal/proxy"
 	"caching-proxy/internal/server"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"

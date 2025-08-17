@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"io"
+	"log"
 )
 
 func StartProxy(port, origin string) {
