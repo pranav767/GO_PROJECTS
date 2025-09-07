@@ -1,17 +1,17 @@
 package main
 
-import 
-    (
-      "time"
-      "encoding/json"
-      "fmt"
-      "io"
-      "net/http"
-      "os"
-      "github.com/gin-gonic/gin"
-      "github.com/gin-contrib/cache"
-      "github.com/gin-contrib/cache/persistence"
-    )
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/gin-contrib/cache"
+	"github.com/gin-contrib/cache/persistence"
+	"github.com/gin-gonic/gin"
+)
 
 func main() {
   router := gin.Default()

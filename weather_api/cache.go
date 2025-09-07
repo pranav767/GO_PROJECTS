@@ -9,7 +9,7 @@ import (
   "github.com/gin-gonic/gin"
 )
 
-func main() {
+func StartCacheServer() {
   r := gin.Default()
 
   // Basic usage:
