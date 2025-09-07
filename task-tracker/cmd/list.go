@@ -1,12 +1,12 @@
 /*
 Copyright © 2025 Pranav <pranavppatil767@gmail.com>
-
 */
 package cmd
 
 import (
 	"fmt"
 	"task-tracker/tasks"
+
 	"github.com/spf13/cobra"
 )
 
@@ -36,13 +36,13 @@ var listDoneCmd = &cobra.Command{
 ./task-tracker list done`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("list done called")
-		task,err := tasks.LoadTasks()
+		task, err := tasks.LoadTasks()
 		if err != nil {
 			fmt.Println("Error loading tasks:", err)
 		}
 		for _, t := range task {
 			if t.Status == "DONE" {
-				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n",t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
+				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n", t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
 			}
 		}
 	},
@@ -56,13 +56,13 @@ var listToDoCmd = &cobra.Command{
 ./task-tracker list todo`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("list todo called")
-		task,err := tasks.LoadTasks()
+		task, err := tasks.LoadTasks()
 		if err != nil {
 			fmt.Println("Error loading tasks:", err)
 		}
 		for _, t := range task {
-			if t.Status == "To-DO" {
-				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n",t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
+			if t.Status == "TO-DO" {
+				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n", t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
 			}
 		}
 	},
@@ -76,13 +76,13 @@ var listInProgressCmd = &cobra.Command{
 ./task-tracker list in-progress`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("list in-progress called")
-		task,err := tasks.LoadTasks()
+		task, err := tasks.LoadTasks()
 		if err != nil {
 			fmt.Println("Error loading tasks:", err)
 		}
 		for _, t := range task {
 			if t.Status == "IN-PROGRESS" {
-				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n",t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
+				fmt.Printf("ID: %d, Description: %s, Status: %s, Created At: %s, Updated At: %s\n", t.ID, t.Description, t.Status, t.CreatedAt, t.UpdatedAt)
 			}
 		}
 	},

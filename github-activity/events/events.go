@@ -1,11 +1,11 @@
 package events
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"io/ioutil"
-	"encoding/json"
 )
 
 // Function to fetch events for a given username
@@ -18,7 +18,7 @@ func FetchEvents(username string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println("Error reading response body:", err)
 		os.Exit(1)
@@ -34,7 +34,7 @@ func FetchEvents(username string) {
 	// Gives a sample output of the first event
 	//b, _ := json.MarshalIndent(events[2], "", "  ")
 	//fmt.Println(string(b))
-	
+
 	for _, event := range events {
 		eventType, _ := event["type"].(string)
 		repo := ""
