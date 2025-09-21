@@ -16,4 +16,7 @@ func SetupRoutes(r *gin.Engine) {
 	auth := r.Group("/")
 	auth.Use(middleware.JWTAuthMiddleware())
 	auth.GET("/profile", controller.ProfileHandler)
+    auth.POST("/cart/add", controller.AddToCartHandler)
+    auth.POST("/cart/remove", controller.RemoveFromCartHandler)
+    auth.GET("/cart", controller.GetCartHandler)
 }

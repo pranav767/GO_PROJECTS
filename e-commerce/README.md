@@ -33,7 +33,7 @@ utils/                     # Utility functions (hashing, JWT)
      -e MYSQL_PASSWORD=adminpass \
      mysql:latest
    ```
-2. **Create the users table:**
+2. **Create the users, products, and cart tables, and insert sample data:**
    ```sh
    docker exec -it mysql bash
    mysql -u root -p
@@ -44,6 +44,26 @@ utils/                     # Utility functions (hashing, JWT)
      username VARCHAR(255) NOT NULL UNIQUE,
      password_hash VARCHAR(255) NOT NULL
    );
+
+   CREATE TABLE products (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     name VARCHAR(255) NOT NULL,
+     description TEXT,
+     price DECIMAL(10,2) NOT NULL,
+     inventory INT NOT NULL
+   );
+
+   CREATE TABLE cart (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     userid INT NOT NULL,
+     items JSON NOT NULL,
+     FOREIGN KEY (userid) REFERENCES users(id)
+   );
+
+   INSERT INTO products (name, description, price, inventory) VALUES
+   ('Laptop', 'A fast laptop', 999.99, 10),
+   ('Phone', 'A smart phone', 499.99, 20),
+   ('Headphones', 'Noise cancelling', 199.99, 15);
    exit
    exit
    ```
@@ -57,6 +77,33 @@ utils/                     # Utility functions (hashing, JWT)
    ```sh
    go run ./cmd/main.go
    ```
+
+
+## Cart API Usage Examples
+
+### Add Product to Cart
+```sh
+curl -X POST http://localhost:8080/cart/add \
+  -H "Authorization: Bearer <jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": 1, "quantity": 2}'
+```
+
+### Remove Product from Cart
+```sh
+curl -X POST http://localhost:8080/cart/remove \
+  -H "Authorization: Bearer <jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": 1, "quantity": 1}'
+```
+
+### Get Cart Details
+```sh
+curl -X GET http://localhost:8080/cart \
+  -H "Authorization: Bearer <jwt-token>"
+```
+
+---
 
 ## API Usage Examples
 
