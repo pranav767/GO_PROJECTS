@@ -2,10 +2,12 @@ package main
 
 import (
 	"e-commerce/internal/db"
+	"e-commerce/internal/payment"
 	"e-commerce/internal/routes"
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -13,7 +15,8 @@ func main() {
 	if err := db.Init(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-
+	godotenv.Load("config.env")
+	payment.InitStripe()
 	// Create Gin router
 	r := gin.Default()
 
