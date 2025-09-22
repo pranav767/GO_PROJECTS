@@ -11,6 +11,7 @@ import (
 func SetupRoutes(r *gin.Engine) {
 	r.POST("/signup", controller.RegisterHandler)
 	r.POST("/login", controller.LoginHandler)
+	r.POST("/webhook", controller.StripeWebhookHandler)
 
 	// Protected route group
 	auth := r.Group("/")
@@ -19,4 +20,5 @@ func SetupRoutes(r *gin.Engine) {
     auth.POST("/cart/add", controller.AddToCartHandler)
     auth.POST("/cart/remove", controller.RemoveFromCartHandler)
     auth.GET("/cart", controller.GetCartHandler)
+	auth.POST("/checkout", controller.CreatePaymentIntentHandler)
 }
