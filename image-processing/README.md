@@ -1,306 +1,357 @@
-# Image Processing API
+# Image Processing API Service
 
-A Go-based REST API for image processing with JWT authentication built using Gin framework.
+A comprehensive Go-based REST API service for image processing with JWT authentication, AWS S3 integration, and powerful transformation capabilities. Built with Gin framework and designed for production use.
 
-## 🚀 Current Status
+## 🌟 Features
 
-Currently implemented:
-- ✅ JWT Authentication (Register/Login)
-- ✅ User Management
-- ✅ MySQL Database Integration
-- 🚧 Image Processing (Coming Soon)
+- ✅ **JWT Authentication** - Secure user registration and login
+- ✅ **Image Upload & Management** - Upload, list, retrieve, and delete images
+- ✅ **AWS S3 Integration** - Scalable cloud storage with organized folder structure
+- ✅ **Image Transformations** - Resize, rotate, flip, color adjustments, filters
+- ✅ **Database Integration** - MySQL with comprehensive audit trails
+- ✅ **Format Support** - JPEG, PNG with quality control
+- ✅ **RESTful Design** - Clean, intuitive API endpoints
+- 🚧 **Rate Limiting** - Coming soon for API protection
+- 🚧 **Input Validation** - Enhanced validation for all endpoints
 
 ## 📋 Prerequisites
 
-- Go 1.21+
-- MySQL 8.0
-- Docker (optional)
+- **Go 1.21+**
+- **MySQL 8.0+**
+- **AWS Account** (for S3 storage)
+- **Docker** (optional, for MySQL)
 
-## 🛠 Setup
+## 🛠️ Installation & Setup
 
-### 1. Clone the Repository
+### 1. Clone Repository
 ```bash
 git clone <repository-url>
 cd image-processing
 ```
 
-### 2. Environment Setup
-Create a `.env` file in the root directory:
-```bash
-HMAC_SECRET=your_super_secret_jwt_key_here
-```
-
-### 3. Database Setup (Docker)
-```bash
-# Run MySQL container
-docker run --name mysql-image \
-  -e MYSQL_ROOT_PASSWORD=adminpass \
-  -e MYSQL_DATABASE=image-processing \
-  -p 3306:3306 \
-  -d mysql:8
-
-# Connect to MySQL (optional)
-docker exec -it mysql-image mysql -u root -p
-```
-
-### 4. Install Dependencies
+### 2. Install Dependencies
 ```bash
 go mod tidy
 ```
 
-### 5. Run the Application
+### 3. Configure Environment
+Create `config.env` file:
+```env
+HMAC_SECRET=your-jwt-secret-key-here
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key
+S3_BUCKET_NAME=your-s3-bucket-name
+MAX_FILE_SIZE=10485760
+ALLOWED_IMAGE_FORMATS=jpg,jpeg,png,gif,webp
+```
+
+### 4. Setup Database
+```bash
+# Using Docker
+docker run --name mysql \
+  -e MYSQL_ROOT_PASSWORD=adminpass \
+  -e MYSQL_DATABASE=image_processing \
+  -p 3306:3306 \
+  -d mysql:8
+
+# Apply database schema
+sudo docker exec -i mysql mysql -u root -padminpass image_processing < internal/db/db.sql
+```
+
+### 5. Run Application
 ```bash
 go run cmd/main.go
 ```
+Server starts on `http://localhost:8080`
 
-The server will start on `http://localhost:8080`
-
-## 🔐 Authentication API
-
-### Register User
-Creates a new user account.
-
-**Endpoint:** `POST /signup`
-
-**Request Body:**
-```json
-{
-  "username": "admin",
-  "password": "adminpass"
-}
-```
-
-**cURL Example:**
-```bash
-curl -X POST http://localhost:8080/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "adminpass"
-  }'
-```
-
-**Success Response:**
-```json
-{
-  "message": "User registered successfully"
-}
-```
-
-**Error Responses:**
-```json
-{
-  "error": "user already exists"
-}
-```
-
----
-
-### Login User
-Authenticates a user and returns a JWT token.
-
-**Endpoint:** `POST /login`
-
-**Request Body:**
-```json
-{
-  "username": "admin",
-  "password": "adminpass"
-}
-```
-
-**cURL Example:**
-```bash
-curl -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "password": "adminpass"
-  }'
-```
-
-**Success Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Error Responses:**
-```json
-{
-  "error": "User does not exist"
-}
-```
-```json
-{
-  "error": "Invalid password"
-}
-```
-
----
-
-## 🧪 Testing the API
-
-### Complete Authentication Flow
-
-1. **Register a new user:**
-```bash
-curl -X POST http://localhost:8080/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "testpass123"
-  }'
-```
-
-2. **Login and get token:**
-```bash
-curl -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "testpass123"
-  }'
-```
-
-3. **Save the token from response and use it for protected routes:**
-```bash
-# Example for future protected endpoints
-TOKEN="your_jwt_token_here"
-
-curl -X GET http://localhost:8080/protected-endpoint \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Test with Multiple Users
-```bash
-# User 1
-curl -X POST http://localhost:8080/signup \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "alice123"}'
-
-# User 2  
-curl -X POST http://localhost:8080/signup \
-  -H "Content-Type: application/json" \
-  -d '{"username": "bob", "password": "bob456"}'
-
-# Login as Alice
-curl -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "alice123"}'
-```
-
-## 📁 Project Structure
+## 🔧 Project Structure
 
 ```
 image-processing/
 ├── cmd/
-│   └── main.go                 # Application entry point
+│   └── main.go                          # Application entry point
 ├── internal/
 │   ├── controller/
-│   │   └── controller.go       # HTTP handlers
+│   │   └── controller.go                # HTTP handlers & endpoints
 │   ├── db/
-│   │   ├── db.go              # Database connection
-│   │   ├── users.go           # User database operations
-│   │   └── aws.go             # AWS integration
+│   │   ├── db.go                        # Database connection
+│   │   ├── aws.go                       # AWS S3 client setup
+│   │   ├── users.go                     # User operations
+│   │   └── images.go                    # Image & transformation ops
 │   ├── middleware/
-│   │   └── jwt.go             # JWT middleware
+│   │   └── jwt.go                       # JWT authentication
+│   ├── routes/
+│   │   └── route.go                     # Route definitions
 │   └── service/
-│       └── auth.go            # Authentication business logic
+│       ├── auth.go                      # Authentication logic
+│       ├── upload_image.go              # Image upload service
+│       └── image_processing.go          # Transformation engine
 ├── model/
-│   └── model.go               # Data models
+│   └── model.go                         # Data models & structs
 ├── utils/
-│   └── utils.go               # Utility functions
-├── go.mod
-├── go.sum
-└── README.md
+│   └── utils.go                         # Utility functions
+├── config.env                           # Environment configuration
+├── test_simple_s3.go                    # S3 connection test
+├── go.mod                               # Go module file
+├── go.sum                               # Dependency checksums
+└── README.md                            # This file
 ```
 
-## 🔧 Configuration
+## 📡 API Endpoints
 
-### Environment Variables
-- `HMAC_SECRET`: Secret key for JWT signing (required)
+### Authentication Endpoints
+| Method | Endpoint   | Description           | Auth Required |
+|--------|------------|-----------------------|---------------|
+| POST   | /register  | Create new user       | No            |
+| POST   | /login     | Authenticate user     | No            |
 
-### Database Configuration
-Update the DSN in `internal/db/db.go`:
-```go
-const DSN = "root:adminpass@tcp(localhost:3306)/image-processing"
-```
+### Image Management Endpoints
+| Method | Endpoint                    | Description                    | Auth Required |
+|--------|-----------------------------|--------------------------------|---------------|
+| POST   | /images                     | Upload image                   | Yes           |
+| GET    | /images                     | List user's images             | Yes           |
+| GET    | /images/{id}               | Get specific image             | Yes           |
+| DELETE | /images/{id}               | Delete image                   | Yes           |
+| POST   | /images/{id}/transform     | Transform image                | Yes           |
+| GET    | /images/{id}/transformations| List image transformations    | Yes           |
 
-## 🐛 Troubleshooting
+## 🚀 API Usage Examples
 
-### Database Connection Issues
-If you're getting "nil pointer dereference" errors:
-
-1. **Ensure MySQL container is running:**
+### Authentication Flow
 ```bash
-docker ps
-# Should show mysql-image container running
+# 1. Register new user
+curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "testpass123"}'
+
+# 2. Login and get JWT token
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "testpass123"}'
+# Save token from response for next steps
+
+# 3. Upload image
+curl -X POST http://localhost:8080/images \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -F "image=@/path/to/image.jpg"
+
+# 4. Transform image
+curl -X POST http://localhost:8080/images/IMAGE_ID/transform \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "width": 800,
+    "height": 600,
+    "resize": "fit",
+    "quality": 95,
+    "format": "jpeg"
+  }'
 ```
 
-2. **Check if database exists:**
-```bash
-docker exec -it mysql-image mysql -u root -p
-# Enter password: adminpass
-# Then run: SHOW DATABASES;
+## 🎨 Image Transformation Options
+
+All transformation parameters are **optional** - include only what you need:
+
+```json
+{
+  "width": 800,           // Resize width
+  "height": 600,          // Resize height  
+  "quality": 90,          // JPEG quality (1-100)
+  "format": "jpeg",       // Output format: jpeg, png
+  "resize": "fit",        // Resize mode: fit, fill, crop
+  "rotate": 90,           // Rotation: 90, 180, 270 degrees
+  "flip": "horizontal",   // Flip: horizontal, vertical
+  "brightness": 15,       // Brightness: -100 to 100
+  "contrast": 10,         // Contrast: -100 to 100
+  "blur": 1.5,           // Blur radius
+  "sharpen": 2.0,        // Sharpen amount
+  "grayscale": true      // Convert to grayscale
+}
 ```
 
-3. **Create database if it doesn't exist:**
-```bash
-docker exec -it mysql-image mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`image-processing\`;"
-```
+### Resize Modes
+- **`fit`** - Resize to fit within dimensions, maintaining aspect ratio
+- **`fill`** - Resize to fill dimensions, may crop, maintaining aspect ratio  
+- **`crop`** - Center crop to exact dimensions
 
-4. **Create users table:**
+## 🗄️ Database Schema
+
+### Users Table
 ```sql
-USE `image-processing`;
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
+CREATE TABLE users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-5. **Test database connection:**
-```bash
-# Check if you can connect with Go's DSN format
-docker exec -it mysql-image mysql -u root -p -h localhost -P 3306 image-processing
+### Images Table  
+```sql
+CREATE TABLE images (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    s3_key VARCHAR(500) NOT NULL,
+    s3_url VARCHAR(1000) NOT NULL,
+    file_size BIGINT NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
 ```
 
-### Common Errors and Solutions
+### Image Transformations Table
+```sql
+CREATE TABLE image_transformations (
+    id VARCHAR(36) PRIMARY KEY,
+    original_image_id VARCHAR(36) NOT NULL,
+    transformed_s3_key VARCHAR(500) NOT NULL,
+    transformed_s3_url VARCHAR(1000) NOT NULL,
+    transformation_params TEXT NOT NULL,
+    file_size BIGINT NOT NULL,
+    format VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (original_image_id) REFERENCES images(id)
+);
+```
 
-**Error: "404 /register"** 
-- Solution: Use `/signup` endpoint instead of `/register`
+## 📦 S3 Storage Structure
 
-**Error: "nil pointer dereference"**
-- Solution: Database connection failed. Check MySQL container and DSN configuration
+```
+your-s3-bucket/
+├── users/
+│   ├── 1/
+│   │   ├── originals/
+│   │   │   ├── uuid1.jpg
+│   │   │   └── uuid2.png
+│   │   └── transformations/
+│   │       ├── transform-uuid1.jpg
+│   │       └── transform-uuid2.jpg
+│   └── 2/
+│       ├── originals/
+│       │   └── uuid3.jpg
+│       └── transformations/
+│           └── transform-uuid3.jpg
+```
 
-**Error: "Invalid JWT token"**
-- Solution: Make sure `HMAC_SECRET` is set in your `.env` file
+## 🔍 Testing & Debugging
 
-## 🚧 Roadmap
+### Test S3 Connection
+```bash
+go run test_simple_s3.go
+```
 
-- [ ] Image upload endpoints
-- [ ] Image processing operations (resize, crop, filter)
-- [ ] File storage (local/AWS S3)
-- [ ] Rate limiting
-- [ ] API documentation (Swagger)
-- [ ] Docker compose setup
-- [ ] Unit tests
+### MySQL Connection Test
+```bash
+sudo docker exec -i mysql mysql -u root -padminpass -e "SHOW DATABASES;"
+```
+
+### Health Check Endpoints
+```bash
+# Test authentication
+curl -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "test", "password": "test"}'
+
+# Test image listing (with auth)
+curl -X GET http://localhost:8080/images \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## ⚡ Performance & Scalability
+
+### Current Implementation
+- **Concurrent Processing** - Go goroutines for image transformations
+- **Efficient Memory Usage** - Streaming uploads to S3
+- **Database Connection Pooling** - MySQL connection management
+- **Image Format Optimization** - JPEG quality control, format conversion
+
+### Planned Optimizations
+- **Caching Layer** - Redis for frequently accessed images
+- **Background Processing** - Queue system for heavy transformations
+- **CDN Integration** - CloudFront for global image delivery
+- **Horizontal Scaling** - Load balancer support
+
+## 🛡️ Security Features
+
+### Current Security
+- ✅ **JWT Authentication** - Secure token-based auth
+- ✅ **Password Hashing** - bcrypt with salt
+- ✅ **User Isolation** - Users can only access their own images
+- ✅ **File Type Validation** - Only allowed image formats
+- ✅ **File Size Limits** - Configurable upload limits
+- ✅ **S3 Access Control** - AWS IAM permissions
+
+## 📈 Future Development
+
+### Phase 1: Enhanced Security & Performance
+- [ ] **Rate Limiting** - Prevent API abuse
+  - Request limits per user/IP
+  - Sliding window implementation
+  - Different limits for different endpoints
+- [ ] **Input Validation** - Comprehensive request validation
+  - Parameter sanitization
+  - File content validation
+  - Request size limits
+- [ ] **API Documentation** - Swagger/OpenAPI integration
+- [ ] **Metrics & Monitoring** - Prometheus integration
+
+### Phase 2: Advanced Features
+- [ ] **Batch Processing** - Multiple image operations
+- [ ] **Watermarking** - Brand/copyright protection
+- [ ] **Face Detection** - AI-powered image analysis
+- [ ] **Format Conversion** - WebP, AVIF support
+- [ ] **Image Optimization** - Automatic compression
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Empty S3 Bucket**
+- Check AWS credentials in `config.env`
+- Verify S3 bucket exists and has proper permissions
+- Review debug logs for upload errors
+
+**Database Connection Errors**  
+- Ensure MySQL container is running: `docker ps`
+- Check database schema is applied
+- Verify connection string in code
+
+**JWT Token Issues**
+- Ensure `HMAC_SECRET` is set in environment
+- Check token format in Authorization header
+- Verify token hasn't expired
+
+**Image Upload Failures**
+- Check file size limits (MAX_FILE_SIZE)
+- Verify allowed file formats
+- Ensure proper multipart form submission
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
 
-## 📝 License
+### Development Guidelines
+- Follow Go naming conventions
+- Add tests for new features
+- Update documentation
+- Use meaningful commit messages
 
-This project is licensed under the MIT License.
+## � Project Inspiration
 
----
+This project is based on the [Image Processing Service](https://roadmap.sh/projects/image-processing-service) project from **roadmap.sh** - a comprehensive backend development project designed to teach scalable image processing with user authentication and transformation capabilities.
 
-**Note:** This API is currently in development. Image processing features will be added in upcoming releases.
+## 🙏 Acknowledgments
+
+- [Gin Web Framework](https://github.com/gin-gonic/gin) - HTTP web framework
+- [disintegration/imaging](https://github.com/disintegration/imaging) - Image processing library
+- [AWS SDK for Go](https://github.com/aws/aws-sdk-go-v2) - AWS services integration
+- [golang-jwt](https://github.com/golang-jwt/jwt) - JWT implementation
+
+**Built with ❤️ and Go**

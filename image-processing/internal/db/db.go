@@ -9,7 +9,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const DSN = "root:adminpass@tcp(localhost:3306)/image-processing"
+const DSN = "root:adminpass@tcp(localhost:3306)/image_processing"
 
 var (
 	db   *sql.DB
