@@ -98,7 +98,7 @@ func (ic *ImageController) UploadImage(c *gin.Context) {
 	defer src.Close()
 
 	// Call the upload service with correct parameters
-	err, resp := ic.uploadService.UploadImage(
+	resp, err := ic.uploadService.UploadImage(
 		c.Request.Context(),
 		file.Filename,
 		file.Size,

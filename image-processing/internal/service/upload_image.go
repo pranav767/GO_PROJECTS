@@ -23,10 +23,10 @@ func NewImageUploadService(s3client *model.S3Client) *ImageUploadService {
 	return &ImageUploadService{s3Client: s3client}
 }
 
-func (s *ImageUploadService) UploadImage(ctx context.Context, filename string, fileSize int64, file io.Reader, contentType string, userID int64) (error, *model.UploadResponse) {
+func (s *ImageUploadService) UploadImage(ctx context.Context, filename string, fileSize int64, file io.Reader, contentType string, userID int64) (*model.UploadResponse, error) {
 	// 1. Validate the image
 	if err := s.validateFile(fileSize, contentType); err != nil {
-		return err, nil
+		return nil, err
 	}
 	//2. Generate a UUID
 	imageID := uuid.New().String()
@@ -36,7 +36,7 @@ func (s *ImageUploadService) UploadImage(ctx context.Context, filename string, f
 	// 4.Upload to s3
 	s3URl, err := s.uploadToS3(ctx, s3Key, file, contentType)
 	if err != nil {
-		return fmt.Errorf("Failed to upload to S3: %w", err), nil
+		return nil, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 	// 5. Create db record
 	image := &model.Image{
@@ -51,7 +51,7 @@ func (s *ImageUploadService) UploadImage(ctx context.Context, filename string, f
 	}
 	// 6.update db
 	if err := db.CreateImage(ctx, image); err != nil {
-		return fmt.Errorf("failed to save image in db: %w", err), nil
+		return nil, fmt.Errorf("failed to save image in db: %w", err)
 	}
 	// 7. return response.
 	response := &model.UploadResponse{
@@ -59,7 +59,7 @@ func (s *ImageUploadService) UploadImage(ctx context.Context, filename string, f
 		URL:      s3URl,
 		Filename: filename,
 	}
-	return nil, response
+	return response, nil
 
 }
 
@@ -68,7 +68,7 @@ func (s *ImageUploadService) validateFile(fileSize int64, contentType string) er
 	//2 .Checkfiletype
 	maxSize := int64(10 << 20) // 10 MB Size
 	if fileSize > maxSize {
-		return errors.New("File Size greater than 10MB")
+		return errors.New("file size greater than 10MB")
 	}
 	fileType := []string{"image/jpg", "image/png", "image/jpeg", "image/gif"}
 	for _, allowed := range fileType {
