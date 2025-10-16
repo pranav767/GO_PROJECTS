@@ -1,0 +1,8 @@
+CREATE DATABASE IF NOT EXISTS e_commerce_carts;
+USE e_commerce_carts;
+
+CREATE TABLE IF NOT EXISTS carts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) UNIQUE NOT NULL,
+  items JSON
+);

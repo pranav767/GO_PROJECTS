@@ -1,6 +1,6 @@
 package main
 
-import "github.com/jinx/database-utility/cmd"
+import "database-utility/cmd"
 
 func main() {
 	cmd.Execute()
