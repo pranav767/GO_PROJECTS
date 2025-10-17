@@ -1,6 +1,7 @@
 # Task Tracker CLI
 
 Task Tracker CLI is a command-line tool to manage your tasks efficiently. It allows you to add, list, update, and delete tasks, as well as mark them as done or in-progress. This project is built in Go using the [Cobra](https://github.com/spf13/cobra) library for command-line interfaces.
+> **Project idea from:** [https://roadmap.sh/projects/task-tracker](https://roadmap.sh/projects/task-tracker)
 
 ## Features
 

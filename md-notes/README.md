@@ -2,6 +2,8 @@
 
 A Go-based REST API for managing Markdown notes, with endpoints for uploading, listing, grammar checking, and rendering notes as HTML.
 
+> Project idea from: https://roadmap.sh/projects/markdown-note-taking-app
+
 ## Features
 
 - Upload notes as Markdown text or file

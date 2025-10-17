@@ -2,6 +2,8 @@
 
 A comprehensive Go-based REST API service for image processing with JWT authentication, AWS S3 integration, and powerful transformation capabilities. Built with Gin framework and designed for production use.
 
+> Project idea from: https://roadmap.sh/projects/image-processing-service
+
 ## 🌟 Features
 
 - ✅ **JWT Authentication** - Secure user registration and login

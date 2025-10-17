@@ -2,6 +2,8 @@
 
 A simple web-based unit converter built with Go and Gin framework.
 
+> Project idea from: https://roadmap.sh/projects/unit-converter
+
 ![Unit Converter](static/image.png)
 
 ## Features

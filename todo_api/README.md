@@ -2,6 +2,8 @@
 
 This project is a simple **Todo List API** built using the Go programming language and MongoDB as the database. It provides endpoints for creating, retrieving, updating, and deleting todos. The project is inspired by the [Todo List API project on roadmap.sh](https://roadmap.sh/projects/todo-list-api).
 
+> Project idea from: https://roadmap.sh/projects/todo-list-api
+
 ## Features
 
 - **User Authentication**: Secure authentication using tokens.

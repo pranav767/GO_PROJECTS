@@ -58,6 +58,8 @@ wscat -c ws://localhost:8080/ws/leaderboard
 Replace `<JWT_TOKEN>` with the token received from the login step.
 # Real-Time Leaderboard System (Go + Redis)
 
+> Project idea from: https://roadmap.sh/projects/realtime-leaderboard-system
+
 This project is a backend system for a real-time leaderboard service. It allows users to register, log in, submit scores for games, view leaderboards, and receive real-time updates. Redis sorted sets are used for efficient leaderboard management.
 
 

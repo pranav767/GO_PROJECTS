@@ -2,6 +2,8 @@
 
 A cross-DB CLI to backup and restore databases (MySQL, PostgreSQL, MongoDB, SQLite).
 
+> Project idea from: https://roadmap.sh/projects/database-backup-utility
+
 This project is a working utility and scaffolding that demonstrates practical, production-minded approaches:
 
 - CLI built with Cobra (`backup`, `restore`, `serve`)
