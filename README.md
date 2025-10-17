@@ -43,3 +43,6 @@ Collection of all go projects
 17. Weather API Wrapper Service: https://roadmap.sh/projects/weather-api-wrapper-service
 
 18. Workout Tracker: https://roadmap.sh/projects/fitness-workout-tracker
+
+19. LeaderBoard System: https://roadmap.sh/projects/realtime-leaderboard-system
+
