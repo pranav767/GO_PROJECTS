@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jinx/database-utility/internal/db"
-	"github.com/jinx/database-utility/internal/logger"
+	"database-utility/internal/db"
+	"database-utility/internal/logger"
 	"github.com/spf13/cobra"
 )
 

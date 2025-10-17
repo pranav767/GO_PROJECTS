@@ -1,4 +1,4 @@
-module github.com/jinx/database-utility
+module database-utility
 
 go 1.22
 

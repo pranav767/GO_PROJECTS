@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jinx/database-utility/internal/compress"
-	"github.com/jinx/database-utility/internal/db"
-	"github.com/jinx/database-utility/internal/notify"
-	"github.com/jinx/database-utility/internal/storage"
+	"database-utility/internal/compress"
+	"database-utility/internal/db"
+	"database-utility/internal/notify"
+	"database-utility/internal/storage"
 	"github.com/spf13/cobra"
 )
 
