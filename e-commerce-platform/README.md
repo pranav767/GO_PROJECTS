@@ -3,6 +3,8 @@
 
 This project is a simple e-commerce backend written in Go, using Gin, MySQL, JWT authentication, and Stripe for payments.
 
+> Project idea from: https://roadmap.sh/projects/scalable-ecommerce-platform
+
 ## Features
 - User registration and login (JWT-based)
 - Add/remove products to/from cart

@@ -2,6 +2,8 @@
 
 A robust backend for movie reservations built with Go (Gin) and MySQL. Supports user and admin flows, dynamic seat logic, and real-time availability. All API examples use dynamic ID extraction for reproducibility.
 
+> Project idea from: https://roadmap.sh/projects/movie-reservation-system
+
 ## Features
 - User registration, login, JWT authentication
 - Browse movies, genres, showtimes

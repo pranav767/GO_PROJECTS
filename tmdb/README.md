@@ -2,6 +2,8 @@
 
 A command-line interface (CLI) for The Movie Database (TMDB), inspired by the [roadmap.sh tmdb-cli project idea](https://roadmap.sh/projects/tmdb-cli).
 
+> Project idea from: https://roadmap.sh/projects/tmdb-cli
+
 ## Project Idea
 This project is a CLI tool that allows users to fetch and display movie data from TMDB directly from their terminal. It supports different movie categories such as now playing, popular, top rated, and upcoming movies. The CLI is built using Go and the Cobra library for easy command and flag management.
 

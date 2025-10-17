@@ -2,6 +2,8 @@
 
 A command-line WebSocket broadcast server and client implementation in Go, allowing multiple clients to connect and communicate in a chat-like environment.
 
+> Project idea from: https://roadmap.sh/projects/broadcast-server
+
 ## Features
 
 - WebSocket-based real-time communication

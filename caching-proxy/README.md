@@ -2,6 +2,8 @@
 
 A simple CLI tool written in Go that acts as a caching proxy server. It forwards requests to an origin server, caches responses, and allows cache clearing at runtime.
 
+> Project idea from: https://roadmap.sh/projects/caching-server
+
 ## Features
 - Start a proxy server on a specified port
 - Forward requests to an origin server

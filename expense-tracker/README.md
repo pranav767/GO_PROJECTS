@@ -2,6 +2,8 @@
 
 A command-line expense tracking application built with Go and Cobra CLI framework. Track your daily expenses with easy-to-use commands.
 
+> Project idea from: https://roadmap.sh/projects/expense-tracker
+
 ## Features
 
 - ✅ Add new expenses with description and amount

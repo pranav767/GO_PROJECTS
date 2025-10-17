@@ -2,6 +2,8 @@
 
 A comprehensive backend system for a workout tracker application that allows users to sign up, log in, create workout plans, schedule workouts, and track their progress.
 
+> Project idea from: https://roadmap.sh/projects/fitness-workout-tracker
+
 ## Features
 
 - **User Authentication**: JWT-based authentication with user registration and login

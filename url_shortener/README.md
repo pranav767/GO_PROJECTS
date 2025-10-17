@@ -2,6 +2,8 @@
 
 A simple URL shortener built with Go, Gin, and MongoDB.
 
+> Project idea from: https://roadmap.sh/projects/url-shortening-service
+
 ## Features
 
 - Shorten long URLs to short codes

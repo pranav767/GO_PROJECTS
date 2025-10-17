@@ -2,6 +2,8 @@
 
 A Go web API that fetches weather data from Visual Crossing Weather API with Redis caching for improved performance.
 
+> Project idea from: https://roadmap.sh/projects/weather-api-wrapper-service
+
 ## Prerequisites
 
 - Go 1.19+
