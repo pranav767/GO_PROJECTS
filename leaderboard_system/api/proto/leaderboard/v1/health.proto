@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package leaderboard.v1;
+
+option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
+
+import "google/api/annotations.proto";
+
+service HealthService {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/healthz"
+    };
+  }
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string mysql = 1;
+  string redis = 2;
+}

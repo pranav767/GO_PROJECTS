@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package leaderboard.v1;
+
+option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
+
+import "google/api/annotations.proto";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/register"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/login"
+      body: "*"
+    };
+  }
+
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {
+    option (google.api.http) = {
+      get: "/api/profile"
+    };
+  }
+}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string message = 1;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string token = 1;
+}
+
+message GetProfileRequest {}
+
+message GetProfileResponse {
+  int64 id = 1;
+  string username = 2;
+  string role = 3;
+}
