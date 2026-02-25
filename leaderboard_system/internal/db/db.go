@@ -2,24 +2,50 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const DSN = "root:adminpass@tcp(localhost:3306)/leaderboard_system?parseTime=true"
-
 var (
 	db   *sql.DB
 	once sync.Once
 )
 
+// getDSN builds the MySQL DSN from environment variables with defaults
+func getDSN() string {
+	user := os.Getenv("DB_USER")
+	if user == "" {
+		user = "root"
+	}
+	pass := os.Getenv("DB_PASS")
+	if pass == "" {
+		pass = "adminpass"
+	}
+	host := os.Getenv("DB_HOST")
+	if host == "" {
+		host = "localhost"
+	}
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "3306"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "leaderboard_system"
+	}
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, pass, host, port, dbName)
+}
+
 func InitDB() error {
 	var err error
 	once.Do(func() {
-		db, err = sql.Open("mysql", DSN)
+		dsn := getDSN()
+		db, err = sql.Open("mysql", dsn)
 		if err != nil {
 			return
 		}

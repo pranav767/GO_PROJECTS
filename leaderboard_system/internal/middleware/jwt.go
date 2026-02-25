@@ -28,7 +28,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Get user details from database to get user ID
+		// Get user details from database to get user ID and role
 		user, err := db.GetUserByUserName(username)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
@@ -36,9 +36,23 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Store both username and userID in context for handlers to use
+		// Store username, userID, and role in context for handlers to use
 		c.Set("username", username)
 		c.Set("userID", fmt.Sprintf("%d", user.ID))
+		c.Set("role", user.Role)
+		c.Next()
+	}
+}
+
+// AdminOnly middleware ensures only admin users can access the endpoint
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role := c.GetString("role")
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }

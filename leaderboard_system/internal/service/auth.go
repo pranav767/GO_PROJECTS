@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"os"
+	"sync"
 	"time"
 	"leaderboard_system/internal/db"
 	"leaderboard_system/model"
@@ -12,11 +13,19 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Load secrets using godotenv
+var (
+	secretOnce sync.Once
+	jwtSecret  []byte
+)
+
+// Load secrets using godotenv (only once)
 func loadSecret() []byte {
-	godotenv.Load()
-	secret := os.Getenv("HMAC_SECRET")
-	return []byte(secret)
+	secretOnce.Do(func() {
+		godotenv.Load()
+		secret := os.Getenv("HMAC_SECRET")
+		jwtSecret = []byte(secret)
+	})
+	return jwtSecret
 }
 
 // Register new user
@@ -34,8 +43,21 @@ func RegisterUser(username string, password string) error {
 		return errors.New("error while generating hash")
 	}
 
-	_, err = db.CreateUser(username, string(hash))
-	return err
+	userID, err := db.CreateUser(username, string(hash))
+	if err != nil {
+		return err
+	}
+
+	// Check if this user should be promoted to admin
+	adminUsername := os.Getenv("ADMIN_USERNAME")
+	if adminUsername != "" && username == adminUsername {
+		if err := db.UpdateUserRole(userID, "admin"); err != nil {
+			// Log but don't fail registration
+			return errors.New("user created but failed to promote to admin: " + err.Error())
+		}
+	}
+
+	return nil
 }
 
 func AuthenticateUser(username string, password string) (bool, error) {
@@ -53,9 +75,16 @@ func AuthenticateUser(username string, password string) (bool, error) {
 }
 
 func GenerateJWT(username string) (string, error) {
-	// New claim
+	// Get user to retrieve role
+	user, err := db.GetUserByUserName(username)
+	if err != nil {
+		return "", errors.New("user not found")
+	}
+
+	// New claim with username and role
 	claims := jwt.MapClaims{
 		"username": username,
+		"role":     user.Role,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	}
 
