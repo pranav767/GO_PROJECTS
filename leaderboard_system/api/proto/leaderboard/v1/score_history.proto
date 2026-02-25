@@ -4,6 +4,7 @@ package leaderboard.v1;
 
 option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
 
+import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 
 service ScoreHistoryService {
@@ -15,7 +16,7 @@ service ScoreHistoryService {
 }
 
 message GetScoreHistoryRequest {
-  string game = 1;
+  string game = 1 [(buf.validate.field).string.min_len = 1];
   int64 user_id = 2;
 }
 

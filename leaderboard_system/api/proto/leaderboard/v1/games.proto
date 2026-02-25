@@ -4,6 +4,7 @@ package leaderboard.v1;
 
 option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
 
+import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 
 service GameService {
@@ -22,7 +23,7 @@ service GameService {
 }
 
 message CreateGameRequest {
-  string name = 1;
+  string name = 1 [(buf.validate.field).string.min_len = 1];
   string description = 2;
 }
 

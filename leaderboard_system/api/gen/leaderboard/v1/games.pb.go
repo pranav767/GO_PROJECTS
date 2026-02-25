@@ -7,6 +7,7 @@
 package leaderboardv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -278,9 +279,9 @@ var File_leaderboard_v1_games_proto protoreflect.FileDescriptor
 
 const file_leaderboard_v1_games_proto_rawDesc = "" +
 	"\n" +
-	"\x1aleaderboard/v1/games.proto\x12\x0eleaderboard.v1\x1a\x1cgoogle/api/annotations.proto\"I\n" +
-	"\x11CreateGameRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\x1aleaderboard/v1/games.proto\x12\x0eleaderboard.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\"R\n" +
+	"\x11CreateGameRequest\x12\x1b\n" +
+	"\x04name\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\">\n" +
 	"\x12CreateGameResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x18\n" +
