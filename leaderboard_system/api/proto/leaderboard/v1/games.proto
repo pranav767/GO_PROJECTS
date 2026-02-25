@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package leaderboard.v1;
+
+option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
+
+import "google/api/annotations.proto";
+
+service GameService {
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {
+    option (google.api.http) = {
+      post: "/api/games"
+      body: "*"
+    };
+  }
+
+  rpc ListGames(ListGamesRequest) returns (ListGamesResponse) {
+    option (google.api.http) = {
+      get: "/api/games"
+    };
+  }
+}
+
+message CreateGameRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message CreateGameResponse {
+  int64 id = 1;
+  string message = 2;
+}
+
+message ListGamesRequest {}
+
+message GameProto {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  string created_at = 4;
+}
+
+message ListGamesResponse {
+  repeated GameProto games = 1;
+}

@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package leaderboard.v1;
+
+option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
+
+import "google/api/annotations.proto";
+
+service LeaderboardService {
+  rpc SubmitScore(SubmitScoreRequest) returns (SubmitScoreResponse) {
+    option (google.api.http) = {
+      post: "/api/submit-score"
+      body: "*"
+    };
+  }
+
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse) {
+    option (google.api.http) = {
+      get: "/api/leaderboard"
+    };
+  }
+
+  rpc GetGlobalLeaderboard(GetGlobalLeaderboardRequest) returns (GetGlobalLeaderboardResponse) {
+    option (google.api.http) = {
+      get: "/api/global-leaderboard"
+    };
+  }
+
+  rpc GetUserRank(GetUserRankRequest) returns (GetUserRankResponse) {
+    option (google.api.http) = {
+      get: "/api/user-rank"
+    };
+  }
+
+  rpc GetTopPlayersByPeriod(GetTopPlayersByPeriodRequest) returns (GetTopPlayersByPeriodResponse) {
+    option (google.api.http) = {
+      get: "/api/top-players"
+    };
+  }
+}
+
+message SubmitScoreRequest {
+  string game = 1;
+  double score = 2;
+}
+
+message SubmitScoreResponse {
+  string message = 1;
+}
+
+message GetLeaderboardRequest {
+  string game = 1;
+  int64 top_n = 2;
+}
+
+message LeaderboardEntryProto {
+  int64 user_id = 1;
+  string username = 2;
+  double score = 3;
+  int64 rank = 4;
+}
+
+message GetLeaderboardResponse {
+  repeated LeaderboardEntryProto entries = 1;
+}
+
+message GetGlobalLeaderboardRequest {
+  int64 top_n = 1;
+}
+
+message GetGlobalLeaderboardResponse {
+  repeated LeaderboardEntryProto entries = 1;
+}
+
+message GetUserRankRequest {
+  string game = 1;
+}
+
+message GetUserRankResponse {
+  int64 user_id = 1;
+  string username = 2;
+  double score = 3;
+  int64 rank = 4;
+}
+
+message GetTopPlayersByPeriodRequest {
+  string game = 1;
+  string period = 2;
+  int64 top_n = 3;
+}
+
+message GetTopPlayersByPeriodResponse {
+  string game = 1;
+  string period = 2;
+  int64 top_n = 3;
+  repeated LeaderboardEntryProto entries = 4;
+}
