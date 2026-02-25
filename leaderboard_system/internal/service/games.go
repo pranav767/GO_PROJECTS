@@ -1,17 +1,17 @@
-
 package service
 
 import (
+	"context"
 	"leaderboard_system/internal/db"
 	"leaderboard_system/model"
 )
 
 // CreateGameService creates a new game
-func CreateGameService(name, description string) (int64, error) {
+func CreateGameService(ctx context.Context, name, description string) (int64, error) {
 	return db.CreateGame(name, description)
 }
 
 // ListGamesService lists all games
-func ListGamesService() ([]model.Game, error) {
+func ListGamesService(ctx context.Context) ([]model.Game, error) {
 	return db.ListGames()
 }

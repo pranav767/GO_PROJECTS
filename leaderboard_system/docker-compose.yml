@@ -1,5 +1,22 @@
-version: '3.8'
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: leaderboard_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: adminpass
+      MYSQL_DATABASE: leaderboard_system
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./internal/db/db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-padminpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7.2-alpine
     container_name: leaderboard_redis
@@ -9,5 +26,7 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
+
 volumes:
+  mysql_data:
   redis_data:

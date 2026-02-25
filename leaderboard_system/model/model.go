@@ -4,6 +4,7 @@ type User struct {
 	ID       int64  `json:"id"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Role     string `json:"role"`
 }
 
 // Score represents a user's score submission for a game/activity

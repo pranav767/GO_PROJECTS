@@ -2,13 +2,12 @@ package db
 
 import (
 	"leaderboard_system/model"
-	"time"
 )
 
 // CreateGame inserts a new game into the database
 func CreateGame(name, description string) (int64, error) {
 	db := GetDB()
-	result, err := db.Exec("INSERT INTO games (name, description, created_at) VALUES (?, ?, ?)", name, description, time.Now().Format(time.RFC3339))
+	result, err := db.Exec("INSERT INTO games (name, description) VALUES (?, ?)", name, description)
 	if err != nil {
 		return 0, err
 	}
@@ -32,4 +31,15 @@ func ListGames() ([]model.Game, error) {
 		games = append(games, g)
 	}
 	return games, nil
+}
+
+// GetGameByName retrieves a game by its name
+func GetGameByName(name string) (*model.Game, error) {
+	db := GetDB()
+	var g model.Game
+	err := db.QueryRow("SELECT id, name, description, created_at FROM games WHERE name = ?", name).Scan(&g.ID, &g.Name, &g.Description, &g.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &g, nil
 }

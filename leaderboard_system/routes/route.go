@@ -13,11 +13,15 @@ func SetupRoutes(r *gin.Engine) {
 	r.POST("/login", controller.LoginHandler)
 	// WebSocket endpoint for real-time leaderboard
 	r.GET("/ws/leaderboard", controller.WebSocketLeaderboardHandler)
+	
 	// Protected routes (JWT authentication required)
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuthMiddleware())
 	{
-		api.POST("/games", controller.CreateGameHandler)
+		// Admin-only routes
+		api.POST("/games", middleware.AdminOnly(), controller.CreateGameHandler)
+		
+		// Regular authenticated user routes
 		api.GET("/games", controller.ListGamesHandler)
 		api.POST("/submit-score", controller.SubmitScoreHandler)
 		api.GET("/score-history", controller.GetScoreHistoryHandler)
@@ -26,8 +30,4 @@ func SetupRoutes(r *gin.Engine) {
 		api.GET("/user-rank", controller.GetUserRankHandler)
 		api.GET("/top-players", controller.GetTopPlayersByPeriodHandler)
 	}
-	//	api.GET("/reports/workout", controller.GenerateWorkoutReportHandler)
-	//	api.GET("/reports/personal-records", controller.GetPersonalRecordsHandler)
-	//	api.GET("/reports/streaks", controller.GetWorkoutStreaksHandler)
-	//}
 }

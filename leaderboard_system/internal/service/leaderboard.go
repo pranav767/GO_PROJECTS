@@ -38,6 +38,11 @@ func GetGlobalLeaderboardService(ctx context.Context, topN int64) ([]model.Leade
 
 // SubmitScoreService handles score submission and leaderboard update
 func SubmitScoreService(ctx context.Context, userID int64, game string, score float64) error {
+	// Validate that the game exists
+	if _, err := db.GetGameByName(game); err != nil {
+		return fmt.Errorf("game '%s' does not exist", game)
+	}
+
 	userIDStr := int64ToString(userID)
 	// 1. Update per-game leaderboard (use max score aggregation)
 	// Fetch existing score (if any) and only replace if incoming is higher
@@ -83,7 +88,7 @@ func SubmitScoreService(ctx context.Context, userID int64, game string, score fl
 	}
 
 	// 4. Persist score history (store every submission, even if it doesn't change leaderboard)
-	if err := db.AddScoreHistory(userID, game, score); err != nil {
+	if err := db.AddScoreHistory(ctx, userID, game, score); err != nil {
 		return err
 	}
 

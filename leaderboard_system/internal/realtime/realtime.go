@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -19,14 +20,17 @@ var (
 func Handler(c *gin.Context) {
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
+		log.Printf("[WS] Upgrade failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upgrade"})
 		return
 	}
+	log.Printf("[WS] Client connected")
 	clientsMu.Lock()
 	clients[ws] = true
 	clientsMu.Unlock()
 	for {
 		if _, _, err := ws.ReadMessage(); err != nil {
+			log.Printf("[WS] Client disconnected: %v", err)
 			clientsMu.Lock()
 			delete(clients, ws)
 			clientsMu.Unlock()
