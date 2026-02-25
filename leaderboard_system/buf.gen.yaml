@@ -11,3 +11,8 @@ plugins:
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+  - remote: buf.build/community/planetscale-vtprotobuf
+    out: api/gen
+    opt:
+      - paths=source_relative
+      - features=marshal+unmarshal+size+pool

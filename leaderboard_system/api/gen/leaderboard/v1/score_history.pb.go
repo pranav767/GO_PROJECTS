@@ -7,6 +7,7 @@
 package leaderboardv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -190,9 +191,9 @@ var File_leaderboard_v1_score_history_proto protoreflect.FileDescriptor
 
 const file_leaderboard_v1_score_history_proto_rawDesc = "" +
 	"\n" +
-	"\"leaderboard/v1/score_history.proto\x12\x0eleaderboard.v1\x1a\x1cgoogle/api/annotations.proto\"E\n" +
-	"\x16GetScoreHistoryRequest\x12\x12\n" +
-	"\x04game\x18\x01 \x01(\tR\x04game\x12\x17\n" +
+	"\"leaderboard/v1/score_history.proto\x12\x0eleaderboard.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\"N\n" +
+	"\x16GetScoreHistoryRequest\x12\x1b\n" +
+	"\x04game\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04game\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\"k\n" +
 	"\n" +
 	"ScoreEntry\x12\x17\n" +

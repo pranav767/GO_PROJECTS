@@ -4,6 +4,7 @@ package leaderboard.v1;
 
 option go_package = "leaderboard_system/api/gen/leaderboard/v1;leaderboardv1";
 
+import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 
 service AuthService {
@@ -29,8 +30,8 @@ service AuthService {
 }
 
 message RegisterRequest {
-  string username = 1;
-  string password = 2;
+  string username = 1 [(buf.validate.field).string.min_len = 3];
+  string password = 2 [(buf.validate.field).string.min_len = 6];
 }
 
 message RegisterResponse {
@@ -38,8 +39,8 @@ message RegisterResponse {
 }
 
 message LoginRequest {
-  string username = 1;
-  string password = 2;
+  string username = 1 [(buf.validate.field).string.min_len = 1];
+  string password = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 message LoginResponse {

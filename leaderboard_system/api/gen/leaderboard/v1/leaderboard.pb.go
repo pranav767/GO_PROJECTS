@@ -7,6 +7,7 @@
 package leaderboardv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -614,37 +615,37 @@ var File_leaderboard_v1_leaderboard_proto protoreflect.FileDescriptor
 
 const file_leaderboard_v1_leaderboard_proto_rawDesc = "" +
 	"\n" +
-	" leaderboard/v1/leaderboard.proto\x12\x0eleaderboard.v1\x1a\x1cgoogle/api/annotations.proto\">\n" +
-	"\x12SubmitScoreRequest\x12\x12\n" +
-	"\x04game\x18\x01 \x01(\tR\x04game\x12\x14\n" +
+	" leaderboard/v1/leaderboard.proto\x12\x0eleaderboard.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1cgoogle/api/annotations.proto\"G\n" +
+	"\x12SubmitScoreRequest\x12\x1b\n" +
+	"\x04game\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04game\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x01R\x05score\"/\n" +
 	"\x13SubmitScoreResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"@\n" +
-	"\x15GetLeaderboardRequest\x12\x12\n" +
-	"\x04game\x18\x01 \x01(\tR\x04game\x12\x13\n" +
-	"\x05top_n\x18\x02 \x01(\x03R\x04topN\"v\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"T\n" +
+	"\x15GetLeaderboardRequest\x12\x1b\n" +
+	"\x04game\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04game\x12\x1e\n" +
+	"\x05top_n\x18\x02 \x01(\x03B\t\xbaH\x06\"\x04\x18d(\x00R\x04topN\"v\n" +
 	"\x15LeaderboardEntryProto\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x01R\x05score\x12\x12\n" +
 	"\x04rank\x18\x04 \x01(\x03R\x04rank\"Y\n" +
 	"\x16GetLeaderboardResponse\x12?\n" +
-	"\aentries\x18\x01 \x03(\v2%.leaderboard.v1.LeaderboardEntryProtoR\aentries\"2\n" +
-	"\x1bGetGlobalLeaderboardRequest\x12\x13\n" +
-	"\x05top_n\x18\x01 \x01(\x03R\x04topN\"_\n" +
+	"\aentries\x18\x01 \x03(\v2%.leaderboard.v1.LeaderboardEntryProtoR\aentries\"=\n" +
+	"\x1bGetGlobalLeaderboardRequest\x12\x1e\n" +
+	"\x05top_n\x18\x01 \x01(\x03B\t\xbaH\x06\"\x04\x18d(\x00R\x04topN\"_\n" +
 	"\x1cGetGlobalLeaderboardResponse\x12?\n" +
-	"\aentries\x18\x01 \x03(\v2%.leaderboard.v1.LeaderboardEntryProtoR\aentries\"(\n" +
-	"\x12GetUserRankRequest\x12\x12\n" +
-	"\x04game\x18\x01 \x01(\tR\x04game\"t\n" +
+	"\aentries\x18\x01 \x03(\v2%.leaderboard.v1.LeaderboardEntryProtoR\aentries\"1\n" +
+	"\x12GetUserRankRequest\x12\x1b\n" +
+	"\x04game\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04game\"t\n" +
 	"\x13GetUserRankResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\x12\x1a\n" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x01R\x05score\x12\x12\n" +
-	"\x04rank\x18\x04 \x01(\x03R\x04rank\"_\n" +
-	"\x1cGetTopPlayersByPeriodRequest\x12\x12\n" +
-	"\x04game\x18\x01 \x01(\tR\x04game\x12\x16\n" +
-	"\x06period\x18\x02 \x01(\tR\x06period\x12\x13\n" +
-	"\x05top_n\x18\x03 \x01(\x03R\x04topN\"\xa1\x01\n" +
+	"\x04rank\x18\x04 \x01(\x03R\x04rank\"s\n" +
+	"\x1cGetTopPlayersByPeriodRequest\x12\x1b\n" +
+	"\x04game\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04game\x12\x16\n" +
+	"\x06period\x18\x02 \x01(\tR\x06period\x12\x1e\n" +
+	"\x05top_n\x18\x03 \x01(\x03B\t\xbaH\x06\"\x04\x18d(\x00R\x04topN\"\xa1\x01\n" +
 	"\x1dGetTopPlayersByPeriodResponse\x12\x12\n" +
 	"\x04game\x18\x01 \x01(\tR\x04game\x12\x16\n" +
 	"\x06period\x18\x02 \x01(\tR\x06period\x12\x13\n" +
