@@ -1,551 +1,574 @@
 # Real-Time Leaderboard System
 
-> A backend system for managing real-time competitive leaderboards with user authentication, score tracking, and live WebSocket updates.
->
+A high-performance leaderboard service built with **gRPC + REST gateway**, **Redis sorted sets**, and **real-time WebSocket** updates.
+
 > Project idea from [roadmap.sh](https://roadmap.sh/projects/realtime-leaderboard-system)
 
-## Overview
+---
 
-This project implements a high-performance real-time leaderboard service where users can compete in various games or activities, submit scores, and view their rankings. The system features user authentication with role-based access control, score submission, real-time leaderboard updates via WebSocket, and comprehensive score history tracking.
+## Table of Contents
 
-Redis sorted sets power the leaderboard functionality, providing efficient O(log N) operations for score updates and rank queries, while MySQL handles persistent storage of users, games, and score history.
+- [Architecture](#architecture)
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Running the Server](#running-the-server)
+- [Trying It Out](#trying-it-out)
+- [API Reference](#api-reference)
+  - [REST Endpoints](#public-endpoints)
+  - [gRPC Services](#grpc-services)
+- [WebSocket](#websocket)
+- [Health & Observability](#health--observability)
+- [Development](#development)
+- [Stopping & Cleanup](#stopping--cleanup)
+- [Security Notes](#security-notes)
+- [Project Structure](#project-structure)
 
-## Features
-
-- **User Authentication**: Secure registration and JWT-based login with role support (user/admin)
-- **Role-Based Access Control**: Admin-only game creation, protected API endpoints
-- **Game Management**: Create and list games/activities (admin only for creation)
-- **Score Submission**: Submit scores for games with automatic max-score aggregation
-- **Score History**: Track complete submission history per user and game
-- **Per-Game Leaderboards**: Top N rankings for individual games
-- **Global Leaderboard**: Aggregate top performers across all games
-- **User Rankings**: Query personal rank and score in any game
-- **Period-Based Reports**: Daily top players using time-keyed sorted sets
-- **Real-Time Updates**: WebSocket broadcasts for live leaderboard changes
-- **Input Validation**: Protected against DoS via topN limits and game validation
-
-## Tech Stack
-
-- **Go 1.24+** with Gin web framework
-- **MySQL 8.0** for persistent user, game, and history storage
-- **Redis 7.2** with sorted sets for leaderboard operations
-- **JWT (golang-jwt/v5)** for stateless authentication
-- **WebSocket (gorilla/websocket)** for real-time updates
-- **Docker Compose** for local development environment
+---
 
 ## Architecture
 
-- **HTTP REST API**: Gin router with JWT middleware for authentication
-- **Redis Sorted Sets**: Keys like `leaderboard:chess`, `leaderboard:global`, `leaderboard:chess:2026-02-25`
-  - Members: user IDs (numeric strings)
-  - Scores: floating point values
-  - Operations: `ZADD`, `ZREVRANGE`, `ZREVRANK`, `ZSCORE`
-- **MySQL Tables**: `users` (auth + roles), `games` (metadata), `score_history` (audit log)
-- **Concurrency**: Goroutines for WebSocket broadcaster, mutex-protected client registry
-- **Score Policy**: Max score per user per game (only higher scores update leaderboards)
+```
+Client  ──►  gRPC Server   (:9090)  ──►  Services  ──►  Redis  (leaderboards)
+        ──►  HTTP Gateway  (:8080)                  ──►  MySQL  (users, games, history)
+        ──►  WebSocket     (/ws/leaderboard)
+        ──►  Metrics       (/metrics)
+        ──►  Health        (/healthz)
+```
+
+- **gRPC** is the primary transport; **grpc-gateway** exposes identical REST endpoints on `:8080`
+- **Redis sorted sets** power O(log N) leaderboard ops — `ZADD`, `ZREVRANGE`, `ZREVRANK`, `ZSCORE`
+- **MySQL** stores users, games, and complete score history (full audit trail)
+- **WebSocket hub** broadcasts live top-10 updates on every score submission
+- **Protobuf-first** API design with [buf](https://buf.build) + `protovalidate` for input validation at the transport layer
+- **Prometheus** metrics collected at both gRPC interceptor and Redis query levels
+
+---
+
+## Features
+
+- **JWT Authentication** — HS256 tokens (24 h expiry), bcrypt password hashing
+- **Role-Based Access Control** — `user` and `admin` roles; game creation is admin-only
+- **Per-Game Leaderboards** — top N rankings per game, backed by Redis sorted sets
+- **Global Leaderboard** — best score per user across all games
+- **Daily Leaderboards** — period-keyed sorted sets (`game:YYYY-MM-DD`) for time-range queries
+- **Max-Score Policy** — leaderboard only updates when new score exceeds the current best
+- **Score History** — every submission logged to MySQL regardless of policy (full audit)
+- **Real-Time WebSocket** — top-10 broadcast for affected game + global on every submission
+- **Health Checks** — custom `/healthz` (MySQL + Redis status) + standard `grpc.health.v1` for Kubernetes probes
+- **Prometheus Metrics** — gRPC request counts/durations (`grpc_requests_total`, `grpc_request_duration_seconds`) and Redis query durations (`redis_query_duration_seconds`)
+- **gRPC Interceptors** — auth, structured logging, Prometheus metrics, panic recovery, proto validation
+- **Integration Tests** — real MySQL + Redis via [testcontainers](https://testcontainers.com)
+- **Minimal Docker Image** — multi-stage build, scratch runtime, non-root user
+
+---
 
 ## Prerequisites
 
-- **Go 1.24+** installed
-- **Docker & Docker Compose** for MySQL and Redis
-- **wscat** or similar for WebSocket testing (optional)
+| Tool | Version |
+|------|---------|
+| Go | 1.25+ |
+| Docker & Docker Compose | any recent |
+| `make` | any |
+| `jq` *(optional)* | pretty-print JSON responses |
+| `wscat` *(optional)* | WebSocket testing |
 
-## Setup Instructions
+---
 
-### 1. Clone the Repository
+## Setup
+
+### 1. Clone
 
 ```bash
 git clone <repo-url>
 cd leaderboard_system
 ```
 
-### 2. Start MySQL and Redis
+### 2. Configure environment
 
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
 
-This starts:
-- MySQL 8.0 on port 3306 (auto-runs `internal/db/db.sql` schema)
-- Redis 7.2 on port 6379 with AOF persistence
-
-### 3. Configure Environment Variables
-
-Create a `.env` file in the project root:
+Edit `.env`:
 
 ```env
-# JWT Secret (required - use a strong random string in production)
-HMAC_SECRET=your_secret_key_change_this_in_production
+# Required — generate with: openssl rand -hex 32
+HMAC_SECRET=change-this-to-a-random-secret
 
-# Redis Configuration
+# Redis
 REDIS_ADDR=localhost:6379
 
-# MySQL Configuration (optional - defaults shown)
+# MySQL (defaults match docker-compose.yml)
 DB_USER=root
 DB_PASS=adminpass
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=leaderboard_system
 
-# Admin User (optional - set to auto-promote first registered user with this username)
+# First user registered with this username gets admin role
 ADMIN_USERNAME=admin
 ```
 
-**Note**: If `ADMIN_USERNAME` is set, the first user registered with that username will be automatically promoted to admin role.
-
-### 4. Install Go Dependencies
+### 3. Start MySQL and Redis
 
 ```bash
-go mod download
+make up
 ```
 
-### 5. Run the Server
+This starts:
+- **MySQL 8.0** on `localhost:3306` — schema auto-applied from `internal/db/db.sql`
+- **Redis 7.2** on `localhost:6379` — AOF persistence enabled
+
+Wait for MySQL to be healthy (~15 s):
 
 ```bash
-go run cmd/main.go
+docker compose ps
+# leaderboard_mysql   Up X seconds (healthy)
+# leaderboard_redis   Up X seconds
 ```
 
-Server starts on `http://localhost:8080`
+---
 
-### 6. Create the First Admin User
+## Running the Server
 
 ```bash
-# Register with the username matching ADMIN_USERNAME
-curl -X POST http://localhost:8080/register \
+make run
+```
+
+Expected output:
+```json
+{"level":"INFO","msg":"gRPC server starting","port":"9090"}
+{"level":"INFO","msg":"HTTP gateway starting","port":"8080"}
+{"level":"INFO","msg":"leaderboard system is running","grpc_port":"9090","http_port":"8080"}
+```
+
+All REST examples below use the HTTP gateway on `:8080`. The same calls work natively via gRPC on `:9090`.
+
+---
+
+## Trying It Out
+
+### 1. Register admin user
+
+```bash
+curl -s -X POST http://localhost:8080/register \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "securepass123"}'
+  -d '{"username": "admin", "password": "admin123"}' | jq
 ```
+```json
+{"message": "User registered successfully"}
+```
+
+> If `ADMIN_USERNAME=admin` is set in `.env`, this user is automatically promoted to admin.
+
+### 2. Login and capture token
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin123"}' | jq -r '.token')
+```
+
+### 3. Create a game *(admin only)*
+
+```bash
+curl -s -X POST http://localhost:8080/api/games \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name": "chess", "description": "Classic strategy board game"}' | jq
+```
+```json
+{"id": "1", "message": "Game created"}
+```
+
+### 4. Register a player and submit scores
+
+```bash
+# Register
+curl -s -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "pass1234"}' | jq
+
+# Login
+ALICE=$(curl -s -X POST http://localhost:8080/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "alice", "password": "pass1234"}' | jq -r '.token')
+
+# Submit initial score
+curl -s -X POST http://localhost:8080/api/submit-score \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ALICE" \
+  -d '{"game": "chess", "score": 1500}' | jq
+
+# Submit higher score — leaderboard updates
+curl -s -X POST http://localhost:8080/api/submit-score \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ALICE" \
+  -d '{"game": "chess", "score": 1800}' | jq
+
+# Submit lower score — leaderboard does NOT update (max-score policy)
+curl -s -X POST http://localhost:8080/api/submit-score \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ALICE" \
+  -d '{"game": "chess", "score": 1200}' | jq
+```
+
+### 5. Query leaderboards
+
+```bash
+# Top 10 for chess
+curl -s "http://localhost:8080/api/leaderboard?game=chess&top_n=10" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Global leaderboard (across all games)
+curl -s "http://localhost:8080/api/global-leaderboard?top_n=10" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Your rank in chess
+curl -s "http://localhost:8080/api/user-rank?game=chess" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Daily top players (defaults to today)
+curl -s "http://localhost:8080/api/top-players?game=chess&top_n=5" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Daily top players for a specific date
+curl -s "http://localhost:8080/api/top-players?game=chess&period=2026-02-26&top_n=5" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Score history (all submissions logged, not just leaderboard updates)
+curl -s "http://localhost:8080/api/score-history?game=chess" \
+  -H "Authorization: Bearer $ALICE" | jq
+
+# Own profile
+curl -s "http://localhost:8080/api/profile" \
+  -H "Authorization: Bearer $ALICE" | jq
+```
+
+### 6. Health check
+
+```bash
+curl -s http://localhost:8080/healthz | jq
+```
+```json
+{"mysql": "ok", "redis": "ok"}
+```
+
+### 7. Prometheus metrics
+
+```bash
+curl -s http://localhost:8080/metrics | grep -E "grpc_requests_total|redis_query"
+```
+
+### 8. WebSocket live updates
+
+In a separate terminal, connect **before** submitting a score:
+
+```bash
+wscat -c ws://localhost:8080/ws/leaderboard
+```
+
+Then submit a score in another terminal — you'll receive:
+
+```json
+{
+  "type": "leaderboard_update",
+  "game": "chess",
+  "entries": [{"user_id": 2, "username": "alice", "score": 1800, "rank": 1}]
+}
+```
+
+Followed immediately by a second broadcast for `"game": "global"`.
+
+---
 
 ## API Reference
 
 ### Public Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/register` | Register a new user |
-| `POST` | `/login` | Authenticate and receive JWT token |
-| `GET` | `/ws/leaderboard` | WebSocket for real-time leaderboard updates |
+| Method | Path | Body / Notes | Description |
+|--------|------|--------------|-------------|
+| `POST` | `/register` | `{"username", "password"}` — min 3 / 6 chars | Create account |
+| `POST` | `/login` | `{"username", "password"}` | Returns JWT token |
+| `GET` | `/healthz` | — | MySQL + Redis status |
+| `GET` | `/ws/leaderboard` | WebSocket upgrade | Live leaderboard feed |
+| `GET` | `/metrics` | — | Prometheus metrics |
 
-### Protected Endpoints (JWT Required)
+### Protected Endpoints
 
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/api/games` | **Admin** | Create a new game |
-| `GET` | `/api/games` | User | List all games |
-| `POST` | `/api/submit-score` | User | Submit a score for a game |
-| `GET` | `/api/score-history` | User | Get own score history (admin can query any user) |
-| `GET` | `/api/leaderboard` | User | Get top N for a game |
-| `GET` | `/api/global-leaderboard` | User | Get top N across all games |
-| `GET` | `/api/user-rank` | User | Get your rank in a game |
-| `GET` | `/api/top-players` | User | Get top N for a game within a time period |
+All require `Authorization: Bearer <token>` header.
 
-### Endpoint Details
+| Method | Path | Role | Query / Body | Description |
+|--------|------|------|--------------|-------------|
+| `GET` | `/api/profile` | User | — | Own user ID, username, role |
+| `POST` | `/api/games` | **Admin** | `{"name", "description"}` | Create a game |
+| `GET` | `/api/games` | User | — | List all games |
+| `POST` | `/api/submit-score` | User | `{"game", "score"}` | Submit a score |
+| `GET` | `/api/leaderboard` | User | `game` (req), `top_n` 1–100 | Top N for a game |
+| `GET` | `/api/global-leaderboard` | User | `top_n` 1–100 | Top N across all games |
+| `GET` | `/api/user-rank` | User | `game` (req) | Your rank + score |
+| `GET` | `/api/top-players` | User | `game` (req), `period` YYYY-MM-DD, `top_n` | Daily top N |
+| `GET` | `/api/score-history` | User | `game` (req); `user_id` (admin only) | Full submission history |
 
-#### `POST /register`
-Register a new user.
+### gRPC Services
 
-**Request Body:**
-```json
-{
-  "username": "alice",
-  "password": "password123"
-}
-```
+The server runs on `:9090`. Package: `leaderboard.v1`. Use [grpcurl](https://github.com/fullstorydev/grpcurl) to call methods directly.
 
-**Response:**
-```json
-{
-  "message": "User registered successfully"
-}
-```
+**AuthService**
 
----
+| Method | Full path | Auth | Description |
+|--------|-----------|------|-------------|
+| `Register` | `/leaderboard.v1.AuthService/Register` | None | Create account |
+| `Login` | `/leaderboard.v1.AuthService/Login` | None | Returns JWT token |
+| `GetProfile` | `/leaderboard.v1.AuthService/GetProfile` | User | Own profile |
 
-#### `POST /login`
-Authenticate and receive a JWT token.
+**GameService**
 
-**Request Body:**
-```json
-{
-  "username": "alice",
-  "password": "password123"
-}
-```
+| Method | Full path | Auth | Description |
+|--------|-----------|------|-------------|
+| `CreateGame` | `/leaderboard.v1.GameService/CreateGame` | Admin | Create a game |
+| `ListGames` | `/leaderboard.v1.GameService/ListGames` | User | List all games |
 
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
+**LeaderboardService**
 
-Use this token in the `Authorization: Bearer <token>` header for protected endpoints.
+| Method | Full path | Auth | Description |
+|--------|-----------|------|-------------|
+| `SubmitScore` | `/leaderboard.v1.LeaderboardService/SubmitScore` | User | Submit a score |
+| `GetLeaderboard` | `/leaderboard.v1.LeaderboardService/GetLeaderboard` | User | Top N for a game |
+| `GetGlobalLeaderboard` | `/leaderboard.v1.LeaderboardService/GetGlobalLeaderboard` | User | Top N across all games |
+| `GetUserRank` | `/leaderboard.v1.LeaderboardService/GetUserRank` | User | Own rank in a game |
+| `GetTopPlayersByPeriod` | `/leaderboard.v1.LeaderboardService/GetTopPlayersByPeriod` | User | Daily top N |
 
----
+**ScoreHistoryService**
 
-#### `POST /api/games` (Admin Only)
-Create a new game.
+| Method | Full path | Auth | Description |
+|--------|-----------|------|-------------|
+| `GetScoreHistory` | `/leaderboard.v1.ScoreHistoryService/GetScoreHistory` | User | Submission history |
 
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
+**HealthService** (custom) + **grpc.health.v1.Health** (standard Kubernetes probe)
 
-**Request Body:**
-```json
-{
-  "name": "chess",
-  "description": "Classic strategy board game"
-}
-```
+| Method | Full path | Auth | Description |
+|--------|-----------|------|-------------|
+| `Check` | `/leaderboard.v1.HealthService/Check` | None | MySQL + Redis status |
+| `Check` | `/grpc.health.v1.Health/Check` | None | Standard gRPC health |
 
-**Response:**
-```json
-{
-  "id": 1,
-  "message": "Game created"
-}
-```
+#### grpcurl Examples
 
----
-
-#### `GET /api/games`
-List all available games.
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "name": "chess",
-    "description": "Classic strategy board game",
-    "created_at": "2026-02-25T10:30:00Z"
-  }
-]
-```
-
----
-
-#### `POST /api/submit-score`
-Submit a score for a game. Only scores higher than your current best are recorded on the leaderboard (max score policy).
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Request Body:**
-```json
-{
-  "game": "chess",
-  "score": 1500
-}
-```
-
-**Response:**
-```json
-{
-  "message": "Score submitted"
-}
-```
-
-**Notes:**
-- Game must exist in the database (created via `/api/games`)
-- All submissions are logged in score history
-- Leaderboards only update if the new score is higher than the previous best
-
----
-
-#### `GET /api/score-history?game=<GAME>`
-Get your score history for a game. Admins can query any user with `?user_id=<ID>`.
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Query Parameters:**
-- `game` (required): Game name
-- `user_id` (admin only): Query another user's history
-
-**Response:**
-```json
-[
-  {
-    "user_id": 1,
-    "game": "chess",
-    "score": 1500,
-    "datetime": "2026-02-25T10:45:00Z"
-  },
-  {
-    "user_id": 1,
-    "game": "chess",
-    "score": 1450,
-    "datetime": "2026-02-24T14:20:00Z"
-  }
-]
-```
-
----
-
-#### `GET /api/leaderboard?game=<GAME>&topN=<N>`
-Get the top N players for a specific game.
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Query Parameters:**
-- `game` (required): Game name
-- `topN` (optional): Number of results (default: 10, max: 100)
-
-**Response:**
-```json
-[
-  {
-    "user_id": 5,
-    "username": "alice",
-    "score": 1800,
-    "rank": 1
-  },
-  {
-    "user_id": 3,
-    "username": "bob",
-    "score": 1750,
-    "rank": 2
-  }
-]
-```
-
----
-
-#### `GET /api/global-leaderboard?topN=<N>`
-Get the top N players across all games (based on each user's highest score in any game).
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Query Parameters:**
-- `topN` (optional): Number of results (default: 10, max: 100)
-
-**Response:**
-```json
-[
-  {
-    "user_id": 5,
-    "username": "alice",
-    "score": 1800,
-    "rank": 1
-  }
-]
-```
-
----
-
-#### `GET /api/user-rank?game=<GAME>`
-Get your rank and score in a specific game.
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Query Parameters:**
-- `game` (required): Game name
-
-**Response:**
-```json
-{
-  "user_id": 5,
-  "username": "alice",
-  "score": 1500,
-  "rank": 3
-}
-```
-
----
-
-#### `GET /api/top-players?game=<GAME>&period=<YYYY-MM-DD>&topN=<N>`
-Get the top N players for a specific game within a time period (daily).
-
-**Headers:** `Authorization: Bearer <JWT_TOKEN>`
-
-**Query Parameters:**
-- `game` (required): Game name
-- `period` (optional): Date in YYYY-MM-DD format (defaults to today)
-- `topN` (optional): Number of results (default: 10, max: 100)
-
-**Response:**
-```json
-{
-  "game": "chess",
-  "period": "2026-02-25",
-  "topN": 5,
-  "entries": [
-    {
-      "user_id": 5,
-      "username": "alice",
-      "score": 1500,
-      "rank": 1
-    }
-  ]
-}
-```
-
----
-
-### WebSocket Endpoint
-
-#### `GET /ws/leaderboard`
-Connect to receive real-time leaderboard updates via WebSocket.
-
-**Example using wscat:**
 ```bash
-wscat -c ws://localhost:8080/ws/leaderboard
+# List all services
+grpcurl -plaintext localhost:9090 list
+
+# Register
+grpcurl -plaintext -d '{"username":"admin","password":"admin123"}' \
+  localhost:9090 leaderboard.v1.AuthService/Register
+
+# Login and capture token
+TOKEN=$(grpcurl -plaintext -d '{"username":"admin","password":"admin123"}' \
+  localhost:9090 leaderboard.v1.AuthService/Login | jq -r '.token')
+
+# Create a game (admin)
+grpcurl -plaintext \
+  -H "authorization: Bearer $TOKEN" \
+  -d '{"name":"chess","description":"Classic board game"}' \
+  localhost:9090 leaderboard.v1.GameService/CreateGame
+
+# Submit a score
+grpcurl -plaintext \
+  -H "authorization: Bearer $TOKEN" \
+  -d '{"game":"chess","score":1500}' \
+  localhost:9090 leaderboard.v1.LeaderboardService/SubmitScore
+
+# Get leaderboard
+grpcurl -plaintext \
+  -H "authorization: Bearer $TOKEN" \
+  -d '{"game":"chess","top_n":10}' \
+  localhost:9090 leaderboard.v1.LeaderboardService/GetLeaderboard
+
+# Health check
+grpcurl -plaintext localhost:9090 leaderboard.v1.HealthService/Check
 ```
 
-**Broadcast Message Format:**
+### Error Codes
+
+| gRPC Code | HTTP | Meaning |
+|-----------|------|---------|
+| `UNAUTHENTICATED` | 401 | Missing or invalid JWT |
+| `PERMISSION_DENIED` | 403 | Admin-only endpoint |
+| `NOT_FOUND` | 404 | Game or user does not exist |
+| `INVALID_ARGUMENT` | 400 | Proto validation failure |
+| `UNAVAILABLE` | 503 | Redis unreachable |
+| `INTERNAL` | 500 | Unexpected server error |
+
+---
+
+## WebSocket
+
+- **Endpoint**: `ws://localhost:8080/ws/leaderboard`
+- **Auth**: none required (read-only broadcast)
+- **Triggers**: every successful `submit-score` call
+- **Broadcasts**: one message for the affected game + one for `"global"`
+
 ```json
 {
   "type": "leaderboard_update",
   "game": "chess",
   "entries": [
-    {
-      "user_id": 5,
-      "username": "alice",
-      "score": 1800,
-      "rank": 1
-    },
-    {
-      "user_id": 3,
-      "username": "bob",
-      "score": 1750,
-      "rank": 2
-    }
+    {"user_id": 1, "username": "alice", "score": 1800, "rank": 1},
+    {"user_id": 2, "username": "bob",   "score": 1600, "rank": 2}
   ]
 }
 ```
 
-**Notes:**
-- No authentication required (read-only broadcast)
-- Server broadcasts top 10 for affected game + global leaderboard on every score submission
-- `game` field is either a game name or `"global"`
+---
 
-## Usage Examples
+## Health & Observability
 
-### Complete Workflow
+### Health Check — `GET /healthz`
 
-```bash
-# 1. Register as admin
-curl -X POST http://localhost:8080/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}'
+Checks MySQL (ping) and Redis (ping). Returns `"ok"` or `"error"` per service.
 
-# 2. Login to get JWT token
-TOKEN=$(curl -s -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "admin123"}' | jq -r '.token')
-
-# 3. Create a game (admin only)
-curl -X POST http://localhost:8080/api/games \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"name": "chess", "description": "Classic board game"}'
-
-# 4. Register a regular user
-curl -X POST http://localhost:8080/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "pass123"}'
-
-# 5. Login as alice
-ALICE_TOKEN=$(curl -s -X POST http://localhost:8080/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "alice", "password": "pass123"}' | jq -r '.token')
-
-# 6. Submit a score
-curl -X POST http://localhost:8080/api/submit-score \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ALICE_TOKEN" \
-  -d '{"game": "chess", "score": 1500}'
-
-# 7. Get leaderboard
-curl -X GET "http://localhost:8080/api/leaderboard?game=chess&topN=10" \
-  -H "Authorization: Bearer $ALICE_TOKEN"
-
-# 8. Get your rank
-curl -X GET "http://localhost:8080/api/user-rank?game=chess" \
-  -H "Authorization: Bearer $ALICE_TOKEN"
-
-# 9. Get global leaderboard
-curl -X GET "http://localhost:8080/api/global-leaderboard?topN=10" \
-  -H "Authorization: Bearer $ALICE_TOKEN"
-
-# 10. View your score history
-curl -X GET "http://localhost:8080/api/score-history?game=chess" \
-  -H "Authorization: Bearer $ALICE_TOKEN"
-
-# 11. Get top players for today
-curl -X GET "http://localhost:8080/api/top-players?game=chess&topN=5" \
-  -H "Authorization: Bearer $ALICE_TOKEN"
-
-# 12. Connect to WebSocket for real-time updates
-wscat -c ws://localhost:8080/ws/leaderboard
+```json
+{"mysql": "ok", "redis": "ok"}
 ```
 
-## Project Requirements Checklist
+Also registered as a standard `grpc.health.v1.Health` service on port `9090` for Kubernetes liveness/readiness probes. The gRPC health status is updated every 5 seconds in the background.
 
-✅ **User Authentication**: JWT-based register + login with bcrypt password hashing  
-✅ **Score Submission**: Users submit scores tied to their authenticated identity  
-✅ **Leaderboard Updates**: Global leaderboard shows top users across all games  
-✅ **User Rankings**: Users can query their rank in any game  
-✅ **Top Players Report**: Generate daily reports using period-keyed sorted sets  
-✅ **Redis Sorted Sets**: All leaderboard data stored and queried via Redis sorted sets  
-✅ **Real-Time Updates**: WebSocket broadcasts leaderboard changes on every score submission  
-✅ **Efficient Rank Queries**: O(log N) operations using `ZREVRANK`, `ZREVRANGE`, `ZSCORE`
+### Prometheus Metrics — `GET /metrics`
 
-## Additional Features Beyond Requirements
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `grpc_requests_total` | Counter | `method`, `code` | Total gRPC requests |
+| `grpc_request_duration_seconds` | Histogram | `method` | gRPC request latency |
+| `redis_query_duration_seconds` | Histogram | `operation` | Redis op latency (`zadd`, `zrevrange`, `zrevrank`) |
+| `websocket_active_connections` | Gauge | — | Live WebSocket connections |
 
-- **Role-Based Access Control**: Admin role with restricted game creation
-- **Score History Audit**: Complete submission log in MySQL
-- **Game Validation**: Scores only accepted for existing games
-- **Input Sanitization**: TopN capped at 100, defaults to 10 on invalid input
-- **Environment-Based Configuration**: All credentials and settings via .env
-- **Max Score Aggregation**: Automatic best-score policy per user per game
-- **Period Leaderboards**: Daily time-series sorted sets for historical reports
+---
 
 ## Development
 
-### Running Tests
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make build` | Compile static binary (`CGO_ENABLED=0`) |
+| `make run` | Build and run the server |
+| `make up` | Start MySQL + Redis via Docker Compose |
+| `make down` | Stop and remove containers (keep volumes) |
+| `make reset` | Stop, remove containers and all data volumes |
+| `make test` | Unit tests with race detector + coverage |
+| `make test-integration` | Integration tests (requires Docker) |
+| `make lint` | Run `golangci-lint` |
+| `make fmt` | Format all Go files |
+| `make vet` | Run `go vet` |
+| `make proto-gen` | Regenerate protobuf code via `buf generate` |
+| `make docker-build` | Build Docker image (`leaderboard-system:latest`) |
+| `make clean` | Remove binary, coverage files, test cache |
+
+### Tests
+
 ```bash
-go test ./...
+# Unit tests — no external dependencies
+make test
+
+# View HTML coverage report
+go tool cover -html=coverage.out
+
+# Integration tests — spins up real MySQL + Redis via testcontainers
+make test-integration
 ```
 
-### Building
+### Regenerating Protobuf
+
+Requires [buf CLI](https://buf.build/docs/installation):
+
 ```bash
-go build -o leaderboard-server cmd/main.go
-./leaderboard-server
+make proto-gen
 ```
 
-### Docker Compose Services
+Proto definitions: `api/proto/leaderboard/v1/`
+Generated code: `api/gen/leaderboard/v1/` *(do not edit)*
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Go 1.25 |
+| API | gRPC, grpc-gateway v2, protobuf (buf, vtprotobuf) |
+| Auth | golang-jwt/v5 (HS256), bcrypt |
+| Database | MySQL 8.0 (go-sql-driver) |
+| Cache / Leaderboard | Redis 7.2 (go-redis/v9) |
+| Real-time | gorilla/websocket |
+| Metrics | Prometheus (client_golang) |
+| Validation | protovalidate (buf.build) |
+| Logging | slog (structured JSON) |
+| Testing | testcontainers-go |
+
+---
+
+## Stopping & Cleanup
+
 ```bash
-# Start services
-docker compose up -d
+# Stop the server
+Ctrl+C
 
-# View logs
-docker compose logs -f
+# Stop and remove containers (data volumes preserved)
+make down
 
-# Stop services
-docker compose down
+# Full reset — stop, remove containers and all data
+make reset
 
-# Reset database
-docker compose down -v
-docker compose up -d
+# Start fresh after reset
+make up
+
+# Remove build artifacts
+make clean
 ```
+
+---
 
 ## Security Notes
 
-- **JWT Secret**: Set a strong `HMAC_SECRET` in production (use `openssl rand -hex 32`)
-- **Password Hashing**: bcrypt with default cost (10 rounds)
-- **SQL Injection**: Parameterized queries throughout
-- **WebSocket**: Public endpoint (no auth) - suitable for read-only leaderboard viewing
-- **Score History**: Access restricted to own user unless admin
-- **Admin Promotion**: Only via environment variable, not via API
+- **JWT Secret**: Set a strong `HMAC_SECRET` — generate with `openssl rand -hex 32`
+- **Password Hashing**: bcrypt, default cost (10 rounds)
+- **SQL Injection**: parameterized queries throughout
+- **Input Validation**: `protovalidate` enforces field constraints at the transport layer (min lengths, value ranges)
+- **Score Bounds**: `top_n` capped at 100 in proto constraints
+- **WebSocket**: public, read-only — no write operations possible
+- **Score History**: users can only access their own; admins can query any user via `user_id` param
+- **Admin Promotion**: only via `ADMIN_USERNAME` env var — not exposed through any API
+
+---
+
+## Project Structure
+
+```
+leaderboard_system/
+├── api/
+│   ├── proto/leaderboard/v1/        Proto definitions (auth, games, leaderboard, score_history, health)
+│   └── gen/leaderboard/v1/          Generated Go code — do not edit
+├── cmd/server/main.go               Entry point
+├── internal/
+│   ├── domain/                      Entities, errors, repository interfaces
+│   ├── repository/                  MySQL + Redis implementations
+│   ├── service/                     Business logic + unit tests
+│   ├── delivery/
+│   │   ├── grpc/                    gRPC servers + interceptors (auth, logging, metrics, recovery, validation)
+│   │   └── ws/                      WebSocket hub
+│   ├── integration/                 End-to-end tests (testcontainers)
+│   └── db/db.sql                    MySQL schema
+├── docker-compose.yml
+├── Dockerfile
+├── Makefile
+└── .env.example
+```
+
+---
 
 ## License
 
 MIT
 
-## Contributing
-
-Contributions welcome! Please open an issue or submit a pull request.
-
 ## Acknowledgments
 
-Project idea from [roadmap.sh backend projects](https://roadmap.sh/projects/realtime-leaderboard-system)
+Project idea from [roadmap.sh backend projects](https://roadmap.sh/projects/realtime-leaderboard-system).

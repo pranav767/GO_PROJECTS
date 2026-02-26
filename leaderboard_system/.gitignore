@@ -1,0 +1,22 @@
+# Binaries
+leaderboard-server
+server
+*.exe
+*.test
+
+# Coverage
+coverage.out
+*.out
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

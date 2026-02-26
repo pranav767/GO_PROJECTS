@@ -30,7 +30,7 @@ func (m *mockLeaderboardRepo) GetLeaderboard(_ context.Context, key string, topN
 	if !ok {
 		return nil, nil
 	}
-	var entries []domain.LeaderboardEntry
+	entries := make([]domain.LeaderboardEntry, 0, len(scores))
 	rank := int64(1)
 	for uid, score := range scores {
 		if rank > topN {
@@ -59,7 +59,7 @@ func (m *mockLeaderboardRepo) GetUserRank(_ context.Context, key, userID string)
 	if !ok {
 		return -1, 0, domain.ErrUserNotFound
 	}
-	return 0, score, nil
+	return 1, score, nil
 }
 
 // mockGameRepo implements domain.GameRepository for testing.
@@ -78,7 +78,7 @@ func (m *mockGameRepo) CreateGame(_ context.Context, name, description string) (
 }
 
 func (m *mockGameRepo) ListGames(_ context.Context) ([]domain.Game, error) {
-	var games []domain.Game
+	games := make([]domain.Game, 0, len(m.games))
 	for _, g := range m.games {
 		games = append(games, *g)
 	}
@@ -179,7 +179,6 @@ func TestSubmitScore_GameNotFound(t *testing.T) {
 		t.Fatal("expected error for nonexistent game")
 	}
 }
-
 
 func TestGetLeaderboard(t *testing.T) {
 	lbRepo := newMockLeaderboardRepo()
