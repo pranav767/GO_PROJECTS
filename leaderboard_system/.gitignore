@@ -1,6 +1,6 @@
 # Binaries
 leaderboard-server
-server
+/server
 *.exe
 *.test
 
