@@ -27,10 +27,8 @@ func (s *ScoreHistoryServer) GetScoreHistory(ctx context.Context, req *pb.GetSco
 		return nil, status.Error(codes.Unauthenticated, "missing authenticated user")
 	}
 
-	// Determine which user's history to fetch
 	targetUserID := authenticatedUserID
 	if req.UserId != 0 && req.UserId != authenticatedUserID {
-		// Only admins can query other users' history
 		if roleFromContext(ctx) != "admin" {
 			return nil, status.Error(codes.PermissionDenied, "admin access required to view other users' history")
 		}

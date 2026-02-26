@@ -30,7 +30,7 @@ func NewAuthService(users domain.UserRepository, secret []byte, adminUsername st
 	}
 }
 
-// Register creates a new user account. Returns domain.ErrUserExists if the username is taken.
+// Register creates a new user account.
 func (s *AuthService) Register(ctx context.Context, username, password string) error {
 	_, err := s.users.GetUserByUsername(ctx, username)
 	if err == nil {
@@ -62,7 +62,7 @@ func (s *AuthService) Register(ctx context.Context, username, password string) e
 	return nil
 }
 
-// Authenticate verifies credentials. Returns domain.ErrUserNotFound or domain.ErrInvalidPassword on failure.
+// Authenticate verifies credentials.
 func (s *AuthService) Authenticate(ctx context.Context, username, password string) (bool, error) {
 	user, err := s.users.GetUserByUsername(ctx, username)
 	if err != nil {
@@ -118,7 +118,7 @@ func (s *AuthService) ValidateJWT(tokenString string) (string, error) {
 	return username, nil
 }
 
-// GetUserByUsername retrieves a user by username. Used by the auth interceptor.
+// GetUserByUsername retrieves a user by username.
 func (s *AuthService) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
 	return s.users.GetUserByUsername(ctx, username)
 }

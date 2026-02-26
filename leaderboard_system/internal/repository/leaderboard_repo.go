@@ -7,13 +7,13 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 
 	"leaderboard_system/internal/domain"
 )
+
+const leaderboardKeyPrefix = "leaderboard:"
 
 // isRedisUnavailable checks whether an error indicates Redis is unreachable.
 func isRedisUnavailable(err error) bool {
@@ -38,8 +38,6 @@ func wrapRedisError(err error) error {
 	return err
 }
 
-const leaderboardKeyPrefix = "leaderboard:"
-
 // LeaderboardRepo implements domain.LeaderboardRepository using Redis sorted sets.
 type LeaderboardRepo struct {
 	client *redis.Client
@@ -51,21 +49,11 @@ func NewLeaderboardRepo(client *redis.Client) *LeaderboardRepo {
 }
 
 func (r *LeaderboardRepo) SubmitScore(ctx context.Context, key, userID string, score float64) error {
-	start := time.Now()
-	defer func() {
-		redisQueryDuration.WithLabelValues("zadd").Observe(time.Since(start).Seconds())
-	}()
-
 	fullKey := leaderboardKeyPrefix + key
 	return wrapRedisError(r.client.ZAdd(ctx, fullKey, redis.Z{Score: score, Member: userID}).Err())
 }
 
 func (r *LeaderboardRepo) GetLeaderboard(ctx context.Context, key string, topN int64) ([]domain.LeaderboardEntry, error) {
-	start := time.Now()
-	defer func() {
-		redisQueryDuration.WithLabelValues("zrevrange").Observe(time.Since(start).Seconds())
-	}()
-
 	fullKey := leaderboardKeyPrefix + key
 	results, err := r.client.ZRevRangeWithScores(ctx, fullKey, 0, topN-1).Result()
 	if err != nil {
@@ -88,11 +76,6 @@ func (r *LeaderboardRepo) GetLeaderboard(ctx context.Context, key string, topN i
 }
 
 func (r *LeaderboardRepo) GetUserRank(ctx context.Context, key, userID string) (int64, float64, error) {
-	start := time.Now()
-	defer func() {
-		redisQueryDuration.WithLabelValues("zrevrank").Observe(time.Since(start).Seconds())
-	}()
-
 	fullKey := leaderboardKeyPrefix + key
 	rank, err := r.client.ZRevRank(ctx, fullKey, userID).Result()
 	if err != nil {
@@ -108,18 +91,5 @@ func (r *LeaderboardRepo) GetUserRank(ctx context.Context, key, userID string) (
 		}
 		return -1, 0, wrapRedisError(err)
 	}
-	return rank + 1, score, nil // +1 to convert 0-based Redis rank to 1-based display rank
-}
-
-var redisQueryDuration = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "redis_query_duration_seconds",
-		Help:    "Redis query duration in seconds",
-		Buckets: prometheus.DefBuckets,
-	},
-	[]string{"operation"},
-)
-
-func init() {
-	prometheus.MustRegister(redisQueryDuration)
+	return rank + 1, score, nil
 }

@@ -1,6 +1,6 @@
 # Real-Time Leaderboard System
 
-A high-performance leaderboard service built with **gRPC + REST gateway**, **Redis sorted sets**, and **real-time WebSocket** updates.
+A leaderboard service built with **gRPC + REST gateway**, **Redis sorted sets**, and **real-time WebSocket** updates.
 
 > Project idea from [roadmap.sh](https://roadmap.sh/projects/realtime-leaderboard-system)
 
@@ -15,10 +15,9 @@ A high-performance leaderboard service built with **gRPC + REST gateway**, **Red
 - [Running the Server](#running-the-server)
 - [Trying It Out](#trying-it-out)
 - [API Reference](#api-reference)
-  - [REST Endpoints](#public-endpoints)
+  - [REST Endpoints](#rest-endpoints)
   - [gRPC Services](#grpc-services)
 - [WebSocket](#websocket)
-- [Health & Observability](#health--observability)
 - [Development](#development)
 - [Stopping & Cleanup](#stopping--cleanup)
 - [Security Notes](#security-notes)
@@ -29,19 +28,16 @@ A high-performance leaderboard service built with **gRPC + REST gateway**, **Red
 ## Architecture
 
 ```
-Client  ──►  gRPC Server   (:9090)  ──►  Services  ──►  Redis  (leaderboards)
-        ──►  HTTP Gateway  (:8080)                  ──►  MySQL  (users, games, history)
+Client  ──►  gRPC Server   (:9090)
+        ──►  HTTP Gateway  (:8080)
         ──►  WebSocket     (/ws/leaderboard)
-        ──►  Metrics       (/metrics)
-        ──►  Health        (/healthz)
 ```
 
-- **gRPC** is the primary transport; **grpc-gateway** exposes identical REST endpoints on `:8080`
+- **gRPC** is the primary transport; **grpc-gateway** exposes the same API as REST on `:8080`
 - **Redis sorted sets** power O(log N) leaderboard ops — `ZADD`, `ZREVRANGE`, `ZREVRANK`, `ZSCORE`
-- **MySQL** stores users, games, and complete score history (full audit trail)
+- **MySQL** stores users, games, and complete score history
 - **WebSocket hub** broadcasts live top-10 updates on every score submission
-- **Protobuf-first** API design with [buf](https://buf.build) + `protovalidate` for input validation at the transport layer
-- **Prometheus** metrics collected at both gRPC interceptor and Redis query levels
+- **Protobuf-first** API with [buf](https://buf.build) + `protovalidate` for input validation at the transport layer
 
 ---
 
@@ -52,12 +48,10 @@ Client  ──►  gRPC Server   (:9090)  ──►  Services  ──►  Redis 
 - **Per-Game Leaderboards** — top N rankings per game, backed by Redis sorted sets
 - **Global Leaderboard** — best score per user across all games
 - **Daily Leaderboards** — period-keyed sorted sets (`game:YYYY-MM-DD`) for time-range queries
-- **Max-Score Policy** — leaderboard only updates when new score exceeds the current best
-- **Score History** — every submission logged to MySQL regardless of policy (full audit)
-- **Real-Time WebSocket** — top-10 broadcast for affected game + global on every submission
-- **Health Checks** — custom `/healthz` (MySQL + Redis status) + standard `grpc.health.v1` for Kubernetes probes
-- **Prometheus Metrics** — gRPC request counts/durations (`grpc_requests_total`, `grpc_request_duration_seconds`) and Redis query durations (`redis_query_duration_seconds`)
-- **gRPC Interceptors** — auth, structured logging, Prometheus metrics, panic recovery, proto validation
+- **Max-Score Policy** — leaderboard only updates when a new score exceeds the current best
+- **Score History** — every submission is logged to MySQL regardless of policy (full audit trail)
+- **Real-Time WebSocket** — top-10 broadcast for the affected game + global on every submission
+- **gRPC Interceptors** — auth (JWT), panic recovery, proto validation
 - **Integration Tests** — real MySQL + Redis via [testcontainers](https://testcontainers.com)
 - **Minimal Docker Image** — multi-stage build, scratch runtime, non-root user
 
@@ -86,11 +80,7 @@ cd leaderboard_system
 
 ### 2. Configure environment
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
+Edit `.env` (already present with sensible defaults):
 
 ```env
 # Required — generate with: openssl rand -hex 32
@@ -108,40 +98,26 @@ DB_NAME=leaderboard_system
 
 # First user registered with this username gets admin role
 ADMIN_USERNAME=admin
+
+GRPC_PORT=9090
+HTTP_PORT=8080
 ```
 
-### 3. Start MySQL and Redis
-
-```bash
-make up
-```
-
-This starts:
-- **MySQL 8.0** on `localhost:3306` — schema auto-applied from `internal/db/db.sql`
-- **Redis 7.2** on `localhost:6379` — AOF persistence enabled
-
-Wait for MySQL to be healthy (~15 s):
-
-```bash
-docker compose ps
-# leaderboard_mysql   Up X seconds (healthy)
-# leaderboard_redis   Up X seconds
-```
-
----
-
-## Running the Server
+### 3. Start and run
 
 ```bash
 make run
 ```
 
-Expected output:
+This starts MySQL + Redis (if not already up), waits for MySQL to be healthy, builds the binary, then runs the server. Expected output:
+
 ```json
 {"level":"INFO","msg":"gRPC server starting","port":"9090"}
 {"level":"INFO","msg":"HTTP gateway starting","port":"8080"}
 {"level":"INFO","msg":"leaderboard system is running","grpc_port":"9090","http_port":"8080"}
 ```
+
+> Use `make up` if you only want the Docker services without running the server (e.g. for integration tests).
 
 All REST examples below use the HTTP gateway on `:8080`. The same calls work natively via gRPC on `:9090`.
 
@@ -177,9 +153,6 @@ curl -s -X POST http://localhost:8080/api/games \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"name": "chess", "description": "Classic strategy board game"}' | jq
-```
-```json
-{"id": "1", "message": "Game created"}
 ```
 
 ### 4. Register a player and submit scores
@@ -237,7 +210,7 @@ curl -s "http://localhost:8080/api/top-players?game=chess&top_n=5" \
 curl -s "http://localhost:8080/api/top-players?game=chess&period=2026-02-26&top_n=5" \
   -H "Authorization: Bearer $ALICE" | jq
 
-# Score history (all submissions logged, not just leaderboard updates)
+# Score history (all submissions logged)
 curl -s "http://localhost:8080/api/score-history?game=chess" \
   -H "Authorization: Bearer $ALICE" | jq
 
@@ -246,22 +219,7 @@ curl -s "http://localhost:8080/api/profile" \
   -H "Authorization: Bearer $ALICE" | jq
 ```
 
-### 6. Health check
-
-```bash
-curl -s http://localhost:8080/healthz | jq
-```
-```json
-{"mysql": "ok", "redis": "ok"}
-```
-
-### 7. Prometheus metrics
-
-```bash
-curl -s http://localhost:8080/metrics | grep -E "grpc_requests_total|redis_query"
-```
-
-### 8. WebSocket live updates
+### 6. WebSocket live updates
 
 In a separate terminal, connect **before** submitting a score:
 
@@ -269,35 +227,26 @@ In a separate terminal, connect **before** submitting a score:
 wscat -c ws://localhost:8080/ws/leaderboard
 ```
 
-Then submit a score in another terminal — you'll receive:
-
-```json
-{
-  "type": "leaderboard_update",
-  "game": "chess",
-  "entries": [{"user_id": 2, "username": "alice", "score": 1800, "rank": 1}]
-}
-```
-
-Followed immediately by a second broadcast for `"game": "global"`.
+Then submit a score — you'll receive a broadcast for the game and for `"global"`.
 
 ---
 
 ## API Reference
 
-### Public Endpoints
+### REST Endpoints
 
-| Method | Path | Body / Notes | Description |
-|--------|------|--------------|-------------|
-| `POST` | `/register` | `{"username", "password"}` — min 3 / 6 chars | Create account |
+#### Public
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `POST` | `/register` | `{"username", "password"}` | Create account |
 | `POST` | `/login` | `{"username", "password"}` | Returns JWT token |
-| `GET` | `/healthz` | — | MySQL + Redis status |
+| `GET` | `/healthz` | — | MySQL + Redis ping status |
 | `GET` | `/ws/leaderboard` | WebSocket upgrade | Live leaderboard feed |
-| `GET` | `/metrics` | — | Prometheus metrics |
 
-### Protected Endpoints
+#### Protected
 
-All require `Authorization: Bearer <token>` header.
+All require `Authorization: Bearer <token>`.
 
 | Method | Path | Role | Query / Body | Description |
 |--------|------|------|--------------|-------------|
@@ -313,45 +262,38 @@ All require `Authorization: Bearer <token>` header.
 
 ### gRPC Services
 
-The server runs on `:9090`. Package: `leaderboard.v1`. Use [grpcurl](https://github.com/fullstorydev/grpcurl) to call methods directly.
+Server runs on `:9090`. Package: `leaderboard.v1`. Use [grpcurl](https://github.com/fullstorydev/grpcurl).
 
 **AuthService**
 
-| Method | Full path | Auth | Description |
-|--------|-----------|------|-------------|
-| `Register` | `/leaderboard.v1.AuthService/Register` | None | Create account |
-| `Login` | `/leaderboard.v1.AuthService/Login` | None | Returns JWT token |
-| `GetProfile` | `/leaderboard.v1.AuthService/GetProfile` | User | Own profile |
+| Method | Auth | Description |
+|--------|------|-------------|
+| `Register` | None | Create account |
+| `Login` | None | Returns JWT token |
+| `GetProfile` | User | Own profile |
 
 **GameService**
 
-| Method | Full path | Auth | Description |
-|--------|-----------|------|-------------|
-| `CreateGame` | `/leaderboard.v1.GameService/CreateGame` | Admin | Create a game |
-| `ListGames` | `/leaderboard.v1.GameService/ListGames` | User | List all games |
+| Method | Auth | Description |
+|--------|------|-------------|
+| `CreateGame` | Admin | Create a game |
+| `ListGames` | User | List all games |
 
 **LeaderboardService**
 
-| Method | Full path | Auth | Description |
-|--------|-----------|------|-------------|
-| `SubmitScore` | `/leaderboard.v1.LeaderboardService/SubmitScore` | User | Submit a score |
-| `GetLeaderboard` | `/leaderboard.v1.LeaderboardService/GetLeaderboard` | User | Top N for a game |
-| `GetGlobalLeaderboard` | `/leaderboard.v1.LeaderboardService/GetGlobalLeaderboard` | User | Top N across all games |
-| `GetUserRank` | `/leaderboard.v1.LeaderboardService/GetUserRank` | User | Own rank in a game |
-| `GetTopPlayersByPeriod` | `/leaderboard.v1.LeaderboardService/GetTopPlayersByPeriod` | User | Daily top N |
+| Method | Auth | Description |
+|--------|------|-------------|
+| `SubmitScore` | User | Submit a score |
+| `GetLeaderboard` | User | Top N for a game |
+| `GetGlobalLeaderboard` | User | Top N across all games |
+| `GetUserRank` | User | Own rank in a game |
+| `GetTopPlayersByPeriod` | User | Daily top N |
 
 **ScoreHistoryService**
 
-| Method | Full path | Auth | Description |
-|--------|-----------|------|-------------|
-| `GetScoreHistory` | `/leaderboard.v1.ScoreHistoryService/GetScoreHistory` | User | Submission history |
-
-**HealthService** (custom) + **grpc.health.v1.Health** (standard Kubernetes probe)
-
-| Method | Full path | Auth | Description |
-|--------|-----------|------|-------------|
-| `Check` | `/leaderboard.v1.HealthService/Check` | None | MySQL + Redis status |
-| `Check` | `/grpc.health.v1.Health/Check` | None | Standard gRPC health |
+| Method | Auth | Description |
+|--------|------|-------------|
+| `GetScoreHistory` | User | Submission history |
 
 #### grpcurl Examples
 
@@ -384,9 +326,6 @@ grpcurl -plaintext \
   -H "authorization: Bearer $TOKEN" \
   -d '{"game":"chess","top_n":10}' \
   localhost:9090 leaderboard.v1.LeaderboardService/GetLeaderboard
-
-# Health check
-grpcurl -plaintext localhost:9090 leaderboard.v1.HealthService/Check
 ```
 
 ### Error Codes
@@ -396,6 +335,7 @@ grpcurl -plaintext localhost:9090 leaderboard.v1.HealthService/Check
 | `UNAUTHENTICATED` | 401 | Missing or invalid JWT |
 | `PERMISSION_DENIED` | 403 | Admin-only endpoint |
 | `NOT_FOUND` | 404 | Game or user does not exist |
+| `ALREADY_EXISTS` | 409 | Username already taken |
 | `INVALID_ARGUMENT` | 400 | Proto validation failure |
 | `UNAVAILABLE` | 503 | Redis unreachable |
 | `INTERNAL` | 500 | Unexpected server error |
@@ -422,45 +362,35 @@ grpcurl -plaintext localhost:9090 leaderboard.v1.HealthService/Check
 
 ---
 
-## Health & Observability
-
-### Health Check — `GET /healthz`
-
-Checks MySQL (ping) and Redis (ping). Returns `"ok"` or `"error"` per service.
-
-```json
-{"mysql": "ok", "redis": "ok"}
-```
-
-Also registered as a standard `grpc.health.v1.Health` service on port `9090` for Kubernetes liveness/readiness probes. The gRPC health status is updated every 5 seconds in the background.
-
-### Prometheus Metrics — `GET /metrics`
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `grpc_requests_total` | Counter | `method`, `code` | Total gRPC requests |
-| `grpc_request_duration_seconds` | Histogram | `method` | gRPC request latency |
-| `redis_query_duration_seconds` | Histogram | `operation` | Redis op latency (`zadd`, `zrevrange`, `zrevrank`) |
-| `websocket_active_connections` | Gauge | — | Live WebSocket connections |
-
----
-
 ## Development
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Go 1.25 |
+| API | gRPC, grpc-gateway v2, protobuf (buf) |
+| Auth | golang-jwt/v5 (HS256), bcrypt |
+| Database | MySQL 8.0 (go-sql-driver) |
+| Cache / Leaderboard | Redis 7.2 (go-redis/v9) |
+| Real-time | gorilla/websocket |
+| Validation | protovalidate (buf.build) |
+| Logging | slog (structured JSON) |
+| Testing | testcontainers-go |
 
 ### Makefile Targets
 
 | Target | Description |
 |--------|-------------|
-| `make build` | Compile static binary (`CGO_ENABLED=0`) |
-| `make run` | Build and run the server |
-| `make up` | Start MySQL + Redis via Docker Compose |
+| `make run` | Start services, build, and run the server |
+| `make up` | Start MySQL + Redis (detached, no server) |
 | `make down` | Stop and remove containers (keep volumes) |
 | `make reset` | Stop, remove containers and all data volumes |
+| `make build` | Compile static binary (`CGO_ENABLED=0`) |
 | `make test` | Unit tests with race detector + coverage |
 | `make test-integration` | Integration tests (requires Docker) |
 | `make lint` | Run `golangci-lint` |
-| `make fmt` | Format all Go files |
-| `make vet` | Run `go vet` |
+| `make tidy` | Tidy `go.mod` and `go.sum` |
 | `make proto-gen` | Regenerate protobuf code via `buf generate` |
 | `make docker-build` | Build Docker image (`leaderboard-system:latest`) |
 | `make clean` | Remove binary, coverage files, test cache |
@@ -489,21 +419,6 @@ make proto-gen
 Proto definitions: `api/proto/leaderboard/v1/`
 Generated code: `api/gen/leaderboard/v1/` *(do not edit)*
 
-### Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Language | Go 1.25 |
-| API | gRPC, grpc-gateway v2, protobuf (buf, vtprotobuf) |
-| Auth | golang-jwt/v5 (HS256), bcrypt |
-| Database | MySQL 8.0 (go-sql-driver) |
-| Cache / Leaderboard | Redis 7.2 (go-redis/v9) |
-| Real-time | gorilla/websocket |
-| Metrics | Prometheus (client_golang) |
-| Validation | protovalidate (buf.build) |
-| Logging | slog (structured JSON) |
-| Testing | testcontainers-go |
-
 ---
 
 ## Stopping & Cleanup
@@ -517,9 +432,6 @@ make down
 
 # Full reset — stop, remove containers and all data
 make reset
-
-# Start fresh after reset
-make up
 
 # Remove build artifacts
 make clean
@@ -545,7 +457,7 @@ make clean
 ```
 leaderboard_system/
 ├── api/
-│   ├── proto/leaderboard/v1/        Proto definitions (auth, games, leaderboard, score_history, health)
+│   ├── proto/leaderboard/v1/        Proto definitions (auth, games, leaderboard, score_history)
 │   └── gen/leaderboard/v1/          Generated Go code — do not edit
 ├── cmd/server/main.go               Entry point
 ├── internal/
@@ -553,21 +465,17 @@ leaderboard_system/
 │   ├── repository/                  MySQL + Redis implementations
 │   ├── service/                     Business logic + unit tests
 │   ├── delivery/
-│   │   ├── grpc/                    gRPC servers + interceptors (auth, logging, metrics, recovery, validation)
+│   │   ├── grpc/                    gRPC servers + interceptors (auth, recovery, validation)
 │   │   └── ws/                      WebSocket hub
 │   ├── integration/                 End-to-end tests (testcontainers)
 │   └── db/db.sql                    MySQL schema
 ├── docker-compose.yml
 ├── Dockerfile
 ├── Makefile
-└── .env.example
+└── .env
 ```
 
 ---
-
-## License
-
-MIT
 
 ## Acknowledgments
 
