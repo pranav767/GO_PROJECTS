@@ -1,7 +1,7 @@
 BIN        := leaderboard-server
 DOCKER_TAG := leaderboard-system:latest
 
-.PHONY: build test test-integration lint proto-gen docker-build run up down reset tidy clean help
+.PHONY: build test test-integration lint fmt proto-gen docker-build run up down reset tidy clean help
 
 help:
 	@echo "Usage: make <target>"
@@ -13,7 +13,8 @@ help:
 	@echo "  build             Build static binary (CGO_ENABLED=0)"
 	@echo "  test              Unit tests with race detector and coverage"
 	@echo "  test-integration  Integration tests (requires Docker)"
-	@echo "  lint              Run golangci-lint"
+	@echo "  fmt               Auto-format Go source files (gofmt)
+  lint              Run golangci-lint"
 	@echo "  proto-gen         Regenerate protobuf code (requires buf)"
 	@echo "  docker-build      Build Docker image"
 	@echo "  tidy              Tidy go.mod and go.sum"
@@ -37,6 +38,9 @@ test:
 
 test-integration:
 	go test -race -count=1 -tags=integration ./internal/integration/...
+
+fmt:
+	gofmt -w .
 
 lint:
 	golangci-lint run ./...

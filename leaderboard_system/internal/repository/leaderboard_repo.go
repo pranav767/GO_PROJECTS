@@ -93,4 +93,3 @@ func (r *LeaderboardRepo) GetUserRank(ctx context.Context, key, userID string) (
 	}
 	return rank + 1, score, nil
 }
-

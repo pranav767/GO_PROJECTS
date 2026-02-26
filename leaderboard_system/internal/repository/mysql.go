@@ -38,7 +38,7 @@ func openAndConfigureMySQL(dsn string, cfg MySQLConfig) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening mysql: %w", err)
 	}
-	
+
 	maxOpenConns := cfg.MaxOpenConns
 	if maxOpenConns == 0 {
 		maxOpenConns = 10
