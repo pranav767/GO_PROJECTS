@@ -17,8 +17,6 @@ import (
 var publicMethods = map[string]bool{
 	"/leaderboard.v1.AuthService/Register": true,
 	"/leaderboard.v1.AuthService/Login":    true,
-	"/grpc.health.v1.Health/Check":         true,
-	"/grpc.health.v1.Health/Watch":         true,
 }
 
 // AuthUnaryInterceptor creates a gRPC unary interceptor for JWT authentication.
