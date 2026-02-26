@@ -4,195 +4,159 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"leaderboard_system/internal/db"
-	"leaderboard_system/internal/realtime"
-	"leaderboard_system/model"
 	"time"
+
+	"leaderboard_system/internal/domain"
 )
 
-// GetGlobalLeaderboardService returns the top N global leaderboard entries
-func GetGlobalLeaderboardService(ctx context.Context, topN int64) ([]model.LeaderboardEntry, error) {
-	entries, err := db.GetGlobalLeaderboard(ctx, topN)
-	if err != nil {
-		return nil, err
-	}
-	var result []model.LeaderboardEntry
-	for i, z := range entries {
-		// Debug: print z.Member value and type
-		//fmt.Printf("[DEBUG] z.Member: value=%v, type=%T\n", z.Member, z.Member)
-		userID, _ := parseUserID(z.Member)
-		//fmt.Printf("[DEBUG] parsed userID: %d\n", userID)
-		username := ""
-		if user, err := db.GetUserByID(userID); err == nil {
-			username = user.Username
-		}
-		result = append(result, model.LeaderboardEntry{
-			UserID:   userID,
-			Username: username,
-			Score:    z.Score,
-			Rank:     int64(i + 1),
-		})
-	}
-	return result, nil
+// Broadcaster is implemented by anything that can push messages to connected clients
+type Broadcaster interface {
+	Broadcast(data []byte)
 }
 
-// SubmitScoreService handles score submission and leaderboard update
-func SubmitScoreService(ctx context.Context, userID int64, game string, score float64) error {
-	// Validate that the game exists
-	if _, err := db.GetGameByName(game); err != nil {
+// LeaderboardService handles leaderboard and score submission operations.
+type LeaderboardService struct {
+	lb      domain.LeaderboardRepository
+	games   domain.GameRepository
+	users   domain.UserRepository
+	history domain.ScoreHistoryRepository
+	bc      Broadcaster
+}
+
+// NewLeaderboardService creates a new LeaderboardService.
+func NewLeaderboardService(
+	lb domain.LeaderboardRepository,
+	games domain.GameRepository,
+	users domain.UserRepository,
+	history domain.ScoreHistoryRepository,
+	bc Broadcaster,
+) *LeaderboardService {
+	return &LeaderboardService{lb: lb, games: games, users: users, history: history, bc: bc}
+}
+
+// SubmitScore records a score for a user in a game and updates all leaderboards.
+func (s *LeaderboardService) SubmitScore(ctx context.Context, userID int64, game string, score float64) error {
+	if _, err := s.games.GetGameByName(ctx, game); err != nil {
 		return fmt.Errorf("game '%s' does not exist", game)
 	}
 
 	userIDStr := int64ToString(userID)
-	// 1. Update per-game leaderboard (use max score aggregation)
-	// Fetch existing score (if any) and only replace if incoming is higher
-	if existingRank, existingScore, err := db.GetUserRank(ctx, game, userIDStr); err == nil && existingRank >= 0 {
-		if score < existingScore {
-			// Keep higher (max) score policy
-		} else {
-			if err := db.SubmitScore(ctx, game, userIDStr, score); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := db.SubmitScore(ctx, game, userIDStr, score); err != nil {
-			return err
-		}
-	}
 
-	// 2. Update global leaderboard (max across all games)
-	if existingRank, existingScore, err := db.GetUserRank(ctx, "global", userIDStr); err == nil && existingRank >= 0 {
-		if score > existingScore { // replace only if better than previous global best
-			if err := db.SubmitScore(ctx, "global", userIDStr, score); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := db.SubmitScore(ctx, "global", userIDStr, score); err != nil {
-			return err
-		}
-	}
-
-	// 3. Update daily (period) leaderboard (date key) always with max semantics per day
-	dayKey := game + ":" + time.Now().Format("2006-01-02")
-	if existingRank, existingScore, err := db.GetUserRank(ctx, dayKey, userIDStr); err == nil && existingRank >= 0 {
-		if score > existingScore {
-			if err := db.SubmitScore(ctx, dayKey, userIDStr, score); err != nil {
-				return err
-			}
-		}
-	} else {
-		if err := db.SubmitScore(ctx, dayKey, userIDStr, score); err != nil {
-			return err
-		}
-	}
-
-	// 4. Persist score history (store every submission, even if it doesn't change leaderboard)
-	if err := db.AddScoreHistory(ctx, userID, game, score); err != nil {
+	// Per-game leaderboard: only replace if new score is higher.
+	if err := s.submitMaxScore(ctx, game, userIDStr, score); err != nil {
 		return err
 	}
 
-	// 5. Broadcast updated top N for the game and global (best effort)
-	broadcastTop := int64(10)
-	if gameEntries, err := GetLeaderboardService(ctx, game, broadcastTop); err == nil {
-		if payload, err := json.Marshal(struct {
-			Type    string                   `json:"type"`
-			Game    string                   `json:"game"`
-			Entries []model.LeaderboardEntry `json:"entries"`
-		}{Type: "leaderboard_update", Game: game, Entries: gameEntries}); err == nil {
-			realtime.Broadcast(payload)
-		}
+	// Global leaderboard: only replace if new score beats the global best.
+	if err := s.submitMaxScore(ctx, "global", userIDStr, score); err != nil {
+		return err
 	}
-	if globalEntries, err := GetGlobalLeaderboardService(ctx, broadcastTop); err == nil {
-		if payload, err := json.Marshal(struct {
-			Type    string                   `json:"type"`
-			Game    string                   `json:"game"`
-			Entries []model.LeaderboardEntry `json:"entries"`
-		}{Type: "leaderboard_update", Game: "global", Entries: globalEntries}); err == nil {
-			realtime.Broadcast(payload)
-		}
+
+	// Daily leaderboard: max-score per day.
+	dayKey := game + ":" + time.Now().Format("2006-01-02")
+	if err := s.submitMaxScore(ctx, dayKey, userIDStr, score); err != nil {
+		return err
 	}
+
+	// Always persist to history (full audit trail).
+	if err := s.history.AddScoreHistory(ctx, userID, game, score); err != nil {
+		return err
+	}
+
+	// Broadcast updated top-10 (best-effort — errors are intentionally ignored).
+	s.broadcastTop(ctx, game)
+	s.broadcastTop(ctx, "global")
+
 	return nil
 }
 
-// GetLeaderboardService returns the top N leaderboard entries for a game
-func GetLeaderboardService(ctx context.Context, game string, topN int64) ([]model.LeaderboardEntry, error) {
-	entries, err := db.GetLeaderboard(ctx, game, topN)
+// GetLeaderboard returns the top N entries for a game leaderboard.
+func (s *LeaderboardService) GetLeaderboard(ctx context.Context, game string, topN int64) ([]domain.LeaderboardEntry, error) {
+	entries, err := s.lb.GetLeaderboard(ctx, game, topN)
 	if err != nil {
 		return nil, err
 	}
-	var result []model.LeaderboardEntry
-	for i, z := range entries {
-		// Debug: print z.Member value and type
-		//fmt.Printf("[DEBUG] z.Member: value=%v, type=%T\n", z.Member, z.Member)
-		userID, _ := parseUserID(z.Member)
-		//fmt.Printf("[DEBUG] parsed userID: %d\n", userID)
-		username := ""
-		if user, err := db.GetUserByID(userID); err == nil {
-			username = user.Username
-		}
-		result = append(result, model.LeaderboardEntry{
-			UserID:   userID,
-			Username: username,
-			Score:    z.Score,
-			Rank:     int64(i + 1),
-		})
-	}
-	return result, nil
+	return s.enrichEntries(ctx, entries), nil
 }
 
-// GetUserRankService returns a user's rank and score for a game
-func GetUserRankService(ctx context.Context, game string, userID int64) (model.LeaderboardEntry, error) {
-	rank, score, err := db.GetUserRank(ctx, game, int64ToString(userID))
+// GetGlobalLeaderboard returns the top N entries across all games.
+func (s *LeaderboardService) GetGlobalLeaderboard(ctx context.Context, topN int64) ([]domain.LeaderboardEntry, error) {
+	entries, err := s.lb.GetLeaderboard(ctx, "global", topN)
 	if err != nil {
-		return model.LeaderboardEntry{}, err
+		return nil, err
 	}
+	return s.enrichEntries(ctx, entries), nil
+}
+
+// GetUserRank returns a user's rank and score for a specific game.
+func (s *LeaderboardService) GetUserRank(ctx context.Context, game string, userID int64) (domain.LeaderboardEntry, error) {
+	rank, score, err := s.lb.GetUserRank(ctx, game, int64ToString(userID))
+	if err != nil {
+		return domain.LeaderboardEntry{}, err
+	}
+
 	username := ""
-	if user, err := db.GetUserByID(userID); err == nil {
+	if user, err := s.users.GetUserByID(ctx, userID); err == nil {
 		username = user.Username
 	}
-	return model.LeaderboardEntry{UserID: userID, Username: username, Score: score, Rank: rank + 1}, nil
+
+	return domain.LeaderboardEntry{
+		UserID:   userID,
+		Username: username,
+		Score:    score,
+		Rank:     rank + 1,
+	}, nil
 }
 
-// GetTopPlayersByPeriodService returns top N players for a game in a period
-func GetTopPlayersByPeriodService(ctx context.Context, game string, period time.Time, topN int64) ([]model.LeaderboardEntry, error) {
-	entries, err := db.GetTopPlayersByPeriod(ctx, game, period, topN)
+// GetTopPlayersByPeriod returns the top N players for a game on a specific date.
+func (s *LeaderboardService) GetTopPlayersByPeriod(ctx context.Context, game string, period time.Time, topN int64) ([]domain.LeaderboardEntry, error) {
+	dayKey := game + ":" + period.Format("2006-01-02")
+	entries, err := s.lb.GetLeaderboard(ctx, dayKey, topN)
 	if err != nil {
 		return nil, err
 	}
-	var result []model.LeaderboardEntry
-	for i, z := range entries {
-		// Debug: print z.Member value and type
-		// fmt.Printf("[DEBUG] z.Member: value=%v, type=%T\n", z.Member, z.Member)
-		userID, _ := parseUserID(z.Member)
-		// fmt.Printf("[DEBUG] parsed userID: %d\n", userID)
-		username := ""
-		if user, err := db.GetUserByID(userID); err == nil {
-			username = user.Username
+	return s.enrichEntries(ctx, entries), nil
+}
+
+// submitMaxScore updates a leaderboard key only when the new score exceeds the existing one.
+func (s *LeaderboardService) submitMaxScore(ctx context.Context, key, userIDStr string, score float64) error {
+	_, existing, err := s.lb.GetUserRank(ctx, key, userIDStr)
+	if err == nil && score <= existing {
+		return nil // existing score is higher or equal — keep it
+	}
+	return s.lb.SubmitScore(ctx, key, userIDStr, score)
+}
+
+// enrichEntries fills in Username and Rank fields for a slice of leaderboard entries.
+func (s *LeaderboardService) enrichEntries(ctx context.Context, entries []domain.LeaderboardEntry) []domain.LeaderboardEntry {
+	for i := range entries {
+		entries[i].Rank = int64(i + 1)
+		if user, err := s.users.GetUserByID(ctx, entries[i].UserID); err == nil {
+			entries[i].Username = user.Username
 		}
-		result = append(result, model.LeaderboardEntry{
-			UserID:   userID,
-			Username: username,
-			Score:    z.Score,
-			Rank:     int64(i + 1),
-		})
 	}
-	return result, nil
+	return entries
 }
 
-// parseUserID tries to parse a Redis member (string) to int64 userID
-func parseUserID(member interface{}) (int64, error) {
-	switch v := member.(type) {
-	case string:
-		return stringToInt64(v)
-	case []byte:
-		return stringToInt64(string(v))
-	default:
-		return 0, nil
+// broadcastTop fetches top-10 for a key and broadcasts the JSON payload (best-effort).
+func (s *LeaderboardService) broadcastTop(ctx context.Context, key string) {
+	entries, err := s.lb.GetLeaderboard(ctx, key, 10)
+	if err != nil {
+		return
 	}
+	payload, err := json.Marshal(struct {
+		Type    string                   `json:"type"`
+		Game    string                   `json:"game"`
+		Entries []domain.LeaderboardEntry `json:"entries"`
+	}{Type: "leaderboard_update", Game: key, Entries: s.enrichEntries(ctx, entries)})
+	if err != nil {
+		return
+	}
+	s.bc.Broadcast(payload)
 }
 
-func stringToInt64(s string) (int64, error) {
+// ParseUserID parses a string representation of a user ID into int64.
+func ParseUserID(s string) (int64, error) {
 	var id int64
 	_, err := fmt.Sscan(s, &id)
 	return id, err

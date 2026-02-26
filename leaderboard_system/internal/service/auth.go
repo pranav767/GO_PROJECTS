@@ -1,123 +1,124 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"os"
-	"sync"
+	"log/slog"
 	"time"
-	"leaderboard_system/internal/db"
-	"leaderboard_system/model"
-	"leaderboard_system/utils"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
+
+	"leaderboard_system/internal/domain"
 )
 
-var (
-	secretOnce sync.Once
-	jwtSecret  []byte
-)
-
-// Load secrets using godotenv (only once)
-func loadSecret() []byte {
-	secretOnce.Do(func() {
-		godotenv.Load()
-		secret := os.Getenv("HMAC_SECRET")
-		jwtSecret = []byte(secret)
-	})
-	return jwtSecret
+// AuthService handles user authentication and JWT token management.
+type AuthService struct {
+	users         domain.UserRepository
+	secret        []byte
+	adminUsername string
+	logger        *slog.Logger
 }
 
-// Register new user
-func RegisterUser(username string, password string) error {
+// NewAuthService creates a new AuthService.
+func NewAuthService(users domain.UserRepository, secret []byte, adminUsername string, logger *slog.Logger) *AuthService {
+	return &AuthService{
+		users:         users,
+		secret:        secret,
+		adminUsername: adminUsername,
+		logger:        logger,
+	}
+}
 
-	// Check if user already exists
-	user, _ := db.GetUserByUserName(username)
-	if user != nil {
-		return errors.New("user already exists")
+// Register creates a new user account. Returns domain.ErrUserExists if the username is taken.
+func (s *AuthService) Register(ctx context.Context, username, password string) error {
+	_, err := s.users.GetUserByUsername(ctx, username)
+	if err == nil {
+		return domain.ErrUserExists
+	}
+	if !errors.Is(err, domain.ErrUserNotFound) {
+		return err
 	}
 
-	// Generate password hash
-	hash, err := utils.GenerateHash([]byte(password))
-	if err != nil {
-		return errors.New("error while generating hash")
-	}
-
-	userID, err := db.CreateUser(username, string(hash))
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	// Check if this user should be promoted to admin
-	adminUsername := os.Getenv("ADMIN_USERNAME")
-	if adminUsername != "" && username == adminUsername {
-		if err := db.UpdateUserRole(userID, "admin"); err != nil {
-			// Log but don't fail registration
-			return errors.New("user created but failed to promote to admin: " + err.Error())
+	userID, err := s.users.CreateUser(ctx, username, string(hash))
+	if err != nil {
+		return err
+	}
+
+	if s.adminUsername != "" && username == s.adminUsername {
+		if err := s.users.UpdateUserRole(ctx, userID, "admin"); err != nil {
+			s.logger.Warn("created user but failed to promote to admin",
+				slog.String("username", username),
+				slog.Any("error", err),
+			)
 		}
 	}
 
 	return nil
 }
 
-func AuthenticateUser(username string, password string) (bool, error) {
-
-	//Get user details
-	user, err := db.GetUserByUserName(username)
+// Authenticate verifies credentials. Returns domain.ErrUserNotFound or domain.ErrInvalidPassword on failure.
+func (s *AuthService) Authenticate(ctx context.Context, username, password string) (bool, error) {
+	user, err := s.users.GetUserByUsername(ctx, username)
 	if err != nil {
-		return false, errors.New("user not found")
+		return false, domain.ErrUserNotFound
 	}
 
-	if !utils.CompareHashwithPassword([]byte(user.Password), []byte(password)) {
-		return false, errors.New("invalid passwd")
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return false, domain.ErrInvalidPassword
 	}
+
 	return true, nil
 }
 
-func GenerateJWT(username string) (string, error) {
-	// Get user to retrieve role
-	user, err := db.GetUserByUserName(username)
+// GenerateJWT creates a signed JWT for the given username.
+func (s *AuthService) GenerateJWT(ctx context.Context, username string) (string, error) {
+	user, err := s.users.GetUserByUsername(ctx, username)
 	if err != nil {
-		return "", errors.New("user not found")
+		return "", domain.ErrUserNotFound
 	}
 
-	// New claim with username and role
 	claims := jwt.MapClaims{
 		"username": username,
 		"role":     user.Role,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	}
 
-	// Sign and get the complete encoded token as a string using the secret
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	secret := loadSecret()
-	return token.SignedString(secret)
+	return token.SignedString(s.secret)
 }
 
-// Validate JWT token
-func ValidateJWT(tokenString string) (string, error) {
-	secret := loadSecret()
+// ValidateJWT parses and validates a JWT, returning the username from claims.
+func (s *AuthService) ValidateJWT(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return secret, nil
+		return s.secret, nil
 	})
 	if err != nil || !token.Valid {
 		return "", err
 	}
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		username, ok := claims["username"].(string)
-		if !ok {
-			return "", errors.New("username not found in token")
-		}
-		return username, nil
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("invalid token claims")
 	}
-	return "", errors.New("invalid token")
+
+	username, ok := claims["username"].(string)
+	if !ok {
+		return "", errors.New("username not found in token")
+	}
+
+	return username, nil
 }
 
-// GetUserByUsername retrieves user by username
-func GetUserByUsername(username string) (*model.User, error) {
-	return db.GetUserByUserName(username)
+// GetUserByUsername retrieves a user by username. Used by the auth interceptor.
+func (s *AuthService) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
+	return s.users.GetUserByUsername(ctx, username)
 }
