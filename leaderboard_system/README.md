@@ -55,11 +55,40 @@ Client  ──►  gRPC Server   (:9090)  ──►  Services  ──►  Redis 
 - **Max-Score Policy** — leaderboard only updates when new score exceeds the current best
 - **Score History** — every submission logged to MySQL regardless of policy (full audit)
 - **Real-Time WebSocket** — top-10 broadcast for affected game + global on every submission
-- **Health Checks** — custom `/healthz` (MySQL + Redis status) + standard `grpc.health.v1` for Kubernetes probes
+- **Health Checks** — `/healthz` HTTP endpoint (MySQL + Redis ping, returns JSON) + standard `grpc.health.v1` for Kubernetes probes
 - **Prometheus Metrics** — gRPC request counts/durations (`grpc_requests_total`, `grpc_request_duration_seconds`) and Redis query durations (`redis_query_duration_seconds`)
 - **gRPC Interceptors** — auth, structured logging, Prometheus metrics, panic recovery, proto validation
 - **Integration Tests** — real MySQL + Redis via [testcontainers](https://testcontainers.com)
 - **Minimal Docker Image** — multi-stage build, scratch runtime, non-root user
+
+---
+
+## Design Decisions
+
+### Why gRPC + grpc-gateway (REST)?
+
+The architecture separates *how services talk to each other* from *how clients talk to the system*.
+
+**gRPC on `:9090` — internal and service-to-service**
+
+- Strongly typed contracts enforced at compile time via generated stubs
+- Binary protobuf encoding is significantly faster and smaller than JSON
+- If a score submission service, a rewards engine, or a notification service is added later, they call this gRPC server directly — no REST overhead, no serialization round-trip
+- Adding a new RPC method to the proto automatically gives any internal caller a typed client for free
+
+**REST on `:8080` (via grpc-gateway) — external client exposure**
+
+- Browsers cannot speak native gRPC (the Fetch API does not support HTTP/2 trailers or binary framing)
+- Mobile games and web frontends use whatever HTTP client they already have — no proto toolchain required
+- Third-party integrations, webhooks, and admin dashboards all expect JSON over HTTP
+- curl, Postman, and any monitoring tool can hit the API without setup
+
+**Why not maintain two separate servers?**
+
+The `.proto` file is the single source of truth. grpc-gateway reads the same proto annotations and generates the REST translation layer — there is no second API definition to keep in sync, no risk of the REST and gRPC contracts drifting apart over time, and no duplicate handler code to maintain. Every new feature added to the proto gets both transports automatically.
+
+> Internal services call `:9090` (gRPC) for performance.
+> External clients, browsers, and scripts call `:8080` (REST).
 
 ---
 
@@ -346,12 +375,11 @@ The server runs on `:9090`. Package: `leaderboard.v1`. Use [grpcurl](https://git
 |--------|-----------|------|-------------|
 | `GetScoreHistory` | `/leaderboard.v1.ScoreHistoryService/GetScoreHistory` | User | Submission history |
 
-**HealthService** (custom) + **grpc.health.v1.Health** (standard Kubernetes probe)
+**grpc.health.v1.Health** (standard Kubernetes probe)
 
 | Method | Full path | Auth | Description |
 |--------|-----------|------|-------------|
-| `Check` | `/leaderboard.v1.HealthService/Check` | None | MySQL + Redis status |
-| `Check` | `/grpc.health.v1.Health/Check` | None | Standard gRPC health |
+| `Check` | `/grpc.health.v1.Health/Check` | None | Standard gRPC health (updated every 5 s) |
 
 #### grpcurl Examples
 
@@ -385,8 +413,8 @@ grpcurl -plaintext \
   -d '{"game":"chess","top_n":10}' \
   localhost:9090 leaderboard.v1.LeaderboardService/GetLeaderboard
 
-# Health check
-grpcurl -plaintext localhost:9090 leaderboard.v1.HealthService/Check
+# Standard gRPC health check
+grpcurl -plaintext localhost:9090 grpc.health.v1.Health/Check
 ```
 
 ### Error Codes
@@ -494,7 +522,7 @@ Generated code: `api/gen/leaderboard/v1/` *(do not edit)*
 | Layer | Technology |
 |-------|-----------|
 | Language | Go 1.25 |
-| API | gRPC, grpc-gateway v2, protobuf (buf, vtprotobuf) |
+| API | gRPC, grpc-gateway v2, protobuf (buf) |
 | Auth | golang-jwt/v5 (HS256), bcrypt |
 | Database | MySQL 8.0 (go-sql-driver) |
 | Cache / Leaderboard | Redis 7.2 (go-redis/v9) |
