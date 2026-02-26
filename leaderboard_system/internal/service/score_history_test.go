@@ -4,23 +4,20 @@ import (
 	"context"
 	"testing"
 
+	"leaderboard_system/internal/domain"
 	"leaderboard_system/internal/service"
 )
 
-func TestAddAndGetScoreHistory(t *testing.T) {
+func TestGetScoreHistory(t *testing.T) {
 	repo := &mockScoreHistoryRepo{}
 	svc := service.NewScoreHistoryService(repo)
 	ctx := context.Background()
 
-	err := svc.AddScoreHistory(ctx, 1, "chess", 1500)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	err = svc.AddScoreHistory(ctx, 1, "chess", 2000)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	// Seed history directly via the repository (AddScoreHistory is a repo concern)
+	repo.history = append(repo.history,
+		domain.Score{UserID: 1, Game: "chess", Score: 1500},
+		domain.Score{UserID: 1, Game: "chess", Score: 2000},
+	)
 
 	scores, err := svc.GetScoreHistory(ctx, 1, "chess")
 	if err != nil {

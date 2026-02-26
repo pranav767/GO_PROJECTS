@@ -42,7 +42,7 @@ func (s *ScoreHistoryServer) GetScoreHistory(ctx context.Context, req *pb.GetSco
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	var entries []*pb.ScoreEntry
+	entries := make([]*pb.ScoreEntry, 0, len(scores))
 	for _, score := range scores {
 		entries = append(entries, &pb.ScoreEntry{
 			UserId:   score.UserID,

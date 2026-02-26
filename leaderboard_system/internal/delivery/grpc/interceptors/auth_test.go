@@ -101,7 +101,6 @@ func TestAuthInterceptor_MissingToken(t *testing.T) {
 	}
 }
 
-
 func TestAuthInterceptor_ValidToken_SetsContext(t *testing.T) {
 	authSvc, interceptor := setupAuthTest(t)
 

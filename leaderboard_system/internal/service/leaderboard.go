@@ -145,21 +145,14 @@ func (s *LeaderboardService) broadcastTop(ctx context.Context, key string) {
 		return
 	}
 	payload, err := json.Marshal(struct {
-		Type    string                   `json:"type"`
-		Game    string                   `json:"game"`
+		Type    string                    `json:"type"`
+		Game    string                    `json:"game"`
 		Entries []domain.LeaderboardEntry `json:"entries"`
 	}{Type: "leaderboard_update", Game: key, Entries: s.enrichEntries(ctx, entries)})
 	if err != nil {
 		return
 	}
 	s.bc.Broadcast(payload)
-}
-
-// ParseUserID parses a string representation of a user ID into int64.
-func ParseUserID(s string) (int64, error) {
-	var id int64
-	_, err := fmt.Sscan(s, &id)
-	return id, err
 }
 
 func int64ToString(id int64) string {

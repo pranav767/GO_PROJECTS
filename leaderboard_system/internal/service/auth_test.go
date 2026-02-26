@@ -95,7 +95,6 @@ func TestRegister_DuplicateUser(t *testing.T) {
 	}
 }
 
-
 func TestAuthenticate_Success(t *testing.T) {
 	repo := newMockUserRepo()
 	svc := service.NewAuthService(repo, []byte("test-secret"), "", testLogger())
@@ -153,16 +152,13 @@ func TestGenerateJWT_ValidToken(t *testing.T) {
 		t.Fatal("expected non-empty token")
 	}
 
-	// Verify JWT format (header.payload.signature)
-	parts := len(token) > 0
-	dotCount := 0
-	for _, ch := range token {
-		if ch == '.' {
-			dotCount++
-		}
+	// Roundtrip: validate the token we just generated
+	username, err := svc.ValidateJWT(token)
+	if err != nil {
+		t.Fatalf("failed to validate generated token: %v", err)
 	}
-	if !parts || dotCount != 2 {
-		t.Fatalf("expected valid JWT format with 3 parts, got %d dots", dotCount)
+	if username != "alice" {
+		t.Fatalf("expected username 'alice', got '%s'", username)
 	}
 }
 
@@ -174,4 +170,3 @@ func TestValidateJWT_InvalidToken(t *testing.T) {
 		t.Fatal("expected error for invalid token")
 	}
 }
-

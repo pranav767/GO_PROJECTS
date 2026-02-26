@@ -40,7 +40,7 @@ func (s *GameServer) ListGames(ctx context.Context, _ *pb.ListGamesRequest) (*pb
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	var pbGames []*pb.GameProto
+	pbGames := make([]*pb.GameProto, 0, len(games))
 	for _, g := range games {
 		pbGames = append(pbGames, &pb.GameProto{
 			Id:          g.ID,
