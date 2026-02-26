@@ -13,8 +13,8 @@ help:
 	@echo "  build             Build static binary (CGO_ENABLED=0)"
 	@echo "  test              Unit tests with race detector and coverage"
 	@echo "  test-integration  Integration tests (requires Docker)"
-	@echo "  fmt               Auto-format Go source files (gofmt)
-  lint              Run golangci-lint"
+	@echo "  fmt               Auto-format Go source files (gofmt)"
+	@echo "  lint              Run golangci-lint"
 	@echo "  proto-gen         Regenerate protobuf code (requires buf)"
 	@echo "  docker-build      Build Docker image"
 	@echo "  tidy              Tidy go.mod and go.sum"
