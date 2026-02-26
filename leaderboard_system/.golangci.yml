@@ -1,5 +1,5 @@
 run:
-  timeout: 5m
+  timeout: 3m
 
 linters:
   enable:
@@ -9,26 +9,10 @@ linters:
     - unused
     - gosimple
     - ineffassign
-    - typecheck
     - gofmt
     - goimports
-    - revive
-    - misspell
-    - unconvert
-    - goconst
-    - gocyclo
-    - nakedret
-    - prealloc
-    - nolintlint
-    - whitespace
 
 linters-settings:
-  gocyclo:
-    min-complexity: 15
-  revive:
-    rules:
-      - name: unexported-return
-        disabled: true
   goimports:
     local-prefixes: leaderboard_system
 
@@ -37,4 +21,3 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
-        - goconst

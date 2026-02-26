@@ -42,28 +42,23 @@ func (s *LeaderboardService) SubmitScore(ctx context.Context, userID int64, game
 
 	userIDStr := int64ToString(userID)
 
-	// Per-game leaderboard: only replace if new score is higher.
 	if err := s.submitMaxScore(ctx, game, userIDStr, score); err != nil {
 		return err
 	}
 
-	// Global leaderboard: only replace if new score beats the global best.
 	if err := s.submitMaxScore(ctx, "global", userIDStr, score); err != nil {
 		return err
 	}
 
-	// Daily leaderboard: max-score per day.
 	dayKey := game + ":" + time.Now().Format("2006-01-02")
 	if err := s.submitMaxScore(ctx, dayKey, userIDStr, score); err != nil {
 		return err
 	}
 
-	// Always persist to history (full audit trail).
 	if err := s.history.AddScoreHistory(ctx, userID, game, score); err != nil {
 		return err
 	}
 
-	// Broadcast updated top-10 (best-effort — errors are intentionally ignored).
 	s.broadcastTop(ctx, game)
 	s.broadcastTop(ctx, "global")
 
@@ -104,7 +99,7 @@ func (s *LeaderboardService) GetUserRank(ctx context.Context, game string, userI
 		UserID:   userID,
 		Username: username,
 		Score:    score,
-		Rank:     rank + 1,
+		Rank:     rank,
 	}, nil
 }
 

@@ -6,17 +6,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus"
 )
-
-var wsActiveConnections = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "websocket_active_connections",
-	Help: "Number of active WebSocket connections",
-})
-
-func init() {
-	prometheus.MustRegister(wsActiveConnections)
-}
 
 // Hub manages WebSocket client connections and message broadcasting.
 // It implements both http.Handler (for serving WebSocket upgrades)
@@ -62,7 +52,7 @@ func (h *Hub) Start() {
 	}()
 }
 
-// Broadcast sends a message to all connected clients (best-effort).
+// Broadcast sends a message to all connected clients.
 // Implements service.Broadcaster interface.
 func (h *Hub) Broadcast(data []byte) {
 	select {
@@ -83,13 +73,11 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.mu.Lock()
 	h.clients[ws] = true
-	wsActiveConnections.Inc()
 	h.mu.Unlock()
 
 	defer func() {
 		h.mu.Lock()
 		delete(h.clients, ws)
-		wsActiveConnections.Dec()
 		h.mu.Unlock()
 		ws.Close()
 	}()

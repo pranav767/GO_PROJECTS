@@ -28,7 +28,6 @@ func NewMySQL(cfg MySQLConfig) (*sql.DB, error) {
 }
 
 // NewMySQLFromDSN creates a MySQL connection from a raw DSN string.
-// Used for integration tests with testcontainers.
 func NewMySQLFromDSN(dsn string) (*sql.DB, error) {
 	return openAndConfigureMySQL(dsn, MySQLConfig{})
 }
@@ -39,8 +38,7 @@ func openAndConfigureMySQL(dsn string, cfg MySQLConfig) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening mysql: %w", err)
 	}
-
-	// Apply defaults
+	
 	maxOpenConns := cfg.MaxOpenConns
 	if maxOpenConns == 0 {
 		maxOpenConns = 10
