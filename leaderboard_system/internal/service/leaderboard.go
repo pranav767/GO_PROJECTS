@@ -10,7 +10,6 @@ import (
 )
 
 // Broadcaster is implemented by anything that can push messages to connected clients
-// (e.g. the WebSocket hub). Keeping it here avoids an import cycle with the delivery layer.
 type Broadcaster interface {
 	Broadcast(data []byte)
 }
@@ -36,8 +35,6 @@ func NewLeaderboardService(
 }
 
 // SubmitScore records a score for a user in a game and updates all leaderboards.
-// Uses max-score semantics: the leaderboard entry is only updated when the new score is higher.
-// Every submission is recorded in score history regardless of the max-score policy.
 func (s *LeaderboardService) SubmitScore(ctx context.Context, userID int64, game string, score float64) error {
 	if _, err := s.games.GetGameByName(ctx, game); err != nil {
 		return fmt.Errorf("game '%s' does not exist", game)
@@ -159,7 +156,6 @@ func (s *LeaderboardService) broadcastTop(ctx context.Context, key string) {
 }
 
 // ParseUserID parses a string representation of a user ID into int64.
-// Exported so it can be fuzz-tested.
 func ParseUserID(s string) (int64, error) {
 	var id int64
 	_, err := fmt.Sscan(s, &id)
