@@ -6,6 +6,27 @@ A backend system for a real-time leaderboard service where users compete in vari
 
 ---
 
+## Table of Contents
+
+- [Project Structure](#project-structure)
+- [Architecture Overview](#architecture-overview)
+- [Why This Architecture?](#why-this-architecture)
+  - [Redis Sorted Sets](#redis-sorted-sets)
+  - [MySQL + Redis — Why Both?](#mysql--redis--why-both)
+  - [gRPC + HTTP Gateway](#grpc--http-gateway--why-not-just-rest)
+  - [WebSocket](#websocket--why-not-just-poll)
+  - [Protobuf + protovalidate](#protobuf--protovalidate--why-not-json-validation)
+  - [JWT with Roles](#jwt-with-roles--why-stateless-auth)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [See It In Action](#see-it-in-action--multi-user-real-time-test)
+- [API Reference](#api-reference)
+- [Development](#development)
+- [Cleanup](#cleanup)
+
+---
+
 ## Project Structure
 
 ```
@@ -28,6 +49,17 @@ leaderboard_system/
 ├── Makefile
 └── .env
 ```
+
+---
+## Architecture Overview
+
+- **Clean Architecture** with domain → service → repository → delivery layers
+- **Dual storage**: Redis sorted sets + MySQL 
+- **Dual protocol**: gRPC + REST via grpc-gateway from single proto definition
+- **Real-time**: WebSocket hub for live leaderboard broadcasts
+- **Auth**: Stateless JWT with role-based access
+- **Validation**: protovalidate interceptors at protocol boundary
+
 ---
 
 ## Why This Architecture?
