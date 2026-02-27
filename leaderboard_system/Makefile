@@ -40,7 +40,9 @@ test-integration:
 	go test -race -count=1 -tags=integration ./internal/integration/...
 
 fmt:
-	gofmt -w .
+	@echo "Formatting Go files"
+	@find . -name "*.go" -not -path "./api/gen/*" -exec gofmt -w {} \;
+	@echo "Done."
 
 lint:
 	golangci-lint run ./...

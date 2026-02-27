@@ -28,23 +28,34 @@ func TestFullFlow_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Start MySQL container
-	mysqlC, err := mysql.Run(ctx, "mysql:8.0",
+	mysqlC, err := mysql.RunContainer(ctx,
+		testcontainers.WithImage("mysql:8.0"),
 		mysql.WithDatabase("leaderboard_system"),
 		mysql.WithUsername("root"),
 		mysql.WithPassword("testpass"),
 		mysql.WithScripts("../../internal/db/db.sql"),
 	)
-	testcontainers.CleanupContainer(t, mysqlC)
 	if err != nil {
 		t.Fatalf("failed to start mysql: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := mysqlC.Terminate(ctx); err != nil {
+			t.Logf("failed to terminate mysql: %v", err)
+		}
+	})
 
 	// Start Redis container
-	redisC, err := redismod.Run(ctx, "redis:7.2-alpine")
-	testcontainers.CleanupContainer(t, redisC)
+	redisC, err := redismod.RunContainer(ctx,
+		testcontainers.WithImage("redis:7.2-alpine"),
+	)
 	if err != nil {
 		t.Fatalf("failed to start redis: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := redisC.Terminate(ctx); err != nil {
+			t.Logf("failed to terminate redis: %v", err)
+		}
+	})
 
 	// Get connection strings
 	mysqlDSN, err := mysqlC.ConnectionString(ctx, "parseTime=true")
